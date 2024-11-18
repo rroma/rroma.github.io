@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hash Indexes</title>
+  </head>
+  <body>
+    <h1 class="code-line" data-line-start=0 data-line-end=1 ><a id="Hash_Indexes_0"></a>Hash Indexes</h1>
+    <p class="has-line-data" data-line-start="2" data-line-end="3">The hash index is an index based on a data structure called a hash map. It utilizes a hash function to transform column values into hash keys (typically numbers). Based on the key, the item is placed into a specific bucket. Normally, values are distributed evenly across buckets. When new elements are added to the hash map, it needs to be rehashed, but only if the load factor exceeds a certain threshold. The load factor is usually defined as the ratio of the number of items in the hash map to the number of buckets.</p>
+    <h2 class="code-line" data-line-start=4 data-line-end=5 ><a id="Pros_4"></a>Pros</h2>
+    <ul>
+    <li class="has-line-data" data-line-start="5" data-line-end="6">Select, update, insert, delete complexity O(1)</li>
+    <li class="has-line-data" data-line-start="6" data-line-end="7">Perform well in case single row select, update, insert, delete with strict condition match:</li>
+    </ul>
+    <pre><code class="has-line-data" data-line-start="8" data-line-end="10" class="language-sql"><span class="hljs-operator"><span class="hljs-keyword">SELECT</span> <span class="hljs-keyword">FROM</span> books <span class="hljs-keyword">WHERE</span> <span class="hljs-keyword">id</span> = <span class="hljs-number">100</span>;</span>
+    </code></pre>
+    <h2 class="code-line" data-line-start=10 data-line-end=11 ><a id="Cons_10"></a>Cons</h2>
+    <ul>
+    <li class="has-line-data" data-line-start="11" data-line-end="12">Relatively high RAM usage</li>
+    <li class="has-line-data" data-line-start="12" data-line-end="13">Performance degrade in case there are lots of duplicated values in indexed column. Duplicated values cause hash collisions</li>
+    <li class="has-line-data" data-line-start="13" data-line-end="14">Doesn’t make sense to use with range conditions like:</li>
+    </ul>
+    <pre><code class="has-line-data" data-line-start="15" data-line-end="17" class="language-sql"><span class="hljs-operator"><span class="hljs-keyword">SELECT</span> <span class="hljs-keyword">FROM</span> books <span class="hljs-keyword">WHERE</span> <span class="hljs-keyword">year</span> <span class="hljs-keyword">BETWEEN</span> <span class="hljs-number">1990</span> <span class="hljs-keyword">AND</span> <span class="hljs-number">2010</span>;</span>
+    </code></pre>
+    <h2 class="code-line" data-line-start=18 data-line-end=19 ><a id="Hash_vs_btree_18"></a>Hash vs btree</h2>
+    <p class="has-line-data" data-line-start="20" data-line-end="21">In general, B-trees are a more universal type of index and have broader use cases. However, there are situations where a hash index may outperform a B-tree. Popular RDBMS systems may load an index fully into RAM or only the necessary parts of the index if that suffices. Unfortunately, to perform efficiently, hash indexes often need to be loaded entirely into RAM.</p>
+    <p class="has-line-data" data-line-start="22" data-line-end="23">For values that are close to each other, hash keys are completely different, causing them to be stored in separate buckets. These buckets are typically located in different areas of persistent storage (HDD or SSD). If you need to access many elements (e.g., during a join operation) in a hash index stored on a hard drive, you will face random memory access, which is relatively slow on hard drives. To improve performance, you need to load the hash index into RAM, as RAM provides random access with nearly the same speed as sequential access. This is why hash indexes tend to consume a significant amount of memory.</p>
+    <p class="has-line-data" data-line-start="24" data-line-end="25">Unlike hash indexes, B-trees are stored primarily in a sequential manner on hard drives, enabling faster reading. Considering the specific characteristics of hash indexes, their ideal usage scenario is for single-row operations based on exact matches.</p>
+  </body>
+</html>
