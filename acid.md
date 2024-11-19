@@ -1,0 +1,1 @@
+# ACID + locking levels + phenomenas
