@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Runner Game</title>
+
+<style>
+
+body {
+  background:#222;
+  color:white;
+  font-family:Arial;
+  text-align:center;
+}
+
+canvas {
+  background:#f2d16b;
+  border:2px solid white;
+  display:block;
+  margin:10px auto;
+}
+
+button {
+  padding:12px;
+  margin:5px;
+  font-size:28px;
+  cursor:pointer;
+  width:70px;
+  height:60px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>🏃 Бегун</h1>
+
+<p>
+Очки: <span id="score">0</span> |
+Жизни: <span id="lives">❤️❤️❤️</span> |
+Раунд: <span id="round">0</span>/20
+</p>
+
+<canvas id="game" width="800" height="300"></canvas>
+
+<div>
+
+<button onclick="doAction('jump')">⬆️</button>
+<button onclick="doAction('flip')">🔄</button>
+<button onclick="doAction('hit')">👊</button>
+<button onclick="doAction('kick')">🦵</button>
+
+</div>
+
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+
+/* ---------- ДАННЫЕ ---------- */
+
+let score=0;
+let lives=3;
+
+let roundCount=0;
+const roundGoal=20;
+
+let gameSpeed=1.3;
+
+let obstacle=null;
+let canAct=false;
+let lastAction=null;
+
+
+/* ---------- ИГРОК ---------- */
+
+const player={
+
+  x:120,
+  baseY:200,
+  y:200,
+
+  w:40,
+  h:60,
+
+  action:"run",
+  animTimer:0,
+
+  rotation:0
+};
+
+
+/* ---------- ПРЕПЯТСТВИЯ ---------- */
+
+const obstacles=[
+
+ {type:"lava",   action:"flip", points:4},
+ {type:"gap",    action:"jump", points:2},
+ {type:"cactus", action:"hit",  points:2},
+ {type:"wall",   action:"kick", points:3}
+
+];
+
+
+/* ---------- UI ---------- */
+
+function updateUI(){
+
+ document.getElementById("score").textContent=score;
+ document.getElementById("lives").textContent="❤️".repeat(lives);
+ document.getElementById("round").textContent=roundCount;
+}
+
+
+/* ---------- СПАВН ---------- */
+
+function spawnObstacle(){
+
+ const o=obstacles[Math.floor(Math.random()*obstacles.length)];
+
+ obstacle={
+
+  x:canvas.width,
+  y:220,
+
+  w:40,
+  h:40,
+
+  type:o.type,
+  action:o.action,
+  points:o.points
+ };
+
+ canAct=true;
+ lastAction=null;
+}
+
+
+/* ---------- КНОПКИ ---------- */
+
+function doAction(a){
+
+ if(!canAct) return;
+
+ lastAction=a;
+
+ player.action=a;
+ player.animTimer=40;
+
+ if(a==="flip"){
+  player.rotation=0;
+ }
+}
+
+
+/* ---------- УСПЕХ ---------- */
+
+function success(){
+
+ if(!obstacle) return;
+
+ score+=obstacle.points;
+ roundCount++;
+
+ obstacle=null;
+ canAct=false;
+
+ if(roundCount>=roundGoal){
+
+  score+=10;
+  roundCount=0;
+
+  alert("🎉 Раунд пройден!");
+ }
+}
+
+
+/* ---------- ПРОВАЛ ---------- */
+
+function fail(){
+
+ if(!obstacle) return;
+
+ lives--;
+
+ obstacle=null;
+ canAct=false;
+
+ player.action="run";
+ player.rotation=0;
+
+ if(lives<=0){
+
+  alert("💀 Игра окончена: "+score);
+  resetGame();
+ }
+}
+
+
+/* ---------- СБРОС ---------- */
+
+function resetGame(){
+
+ score=0;
+ lives=3;
+ roundCount=0;
+
+ obstacle=null;
+ canAct=false;
+
+ updateUI();
+}
+
+
+/* ---------- ФОН ---------- */
+
+function drawBackground(){
+
+ ctx.fillStyle="#f2d16b";
+ ctx.fillRect(0,0,800,300);
+
+ // Земля
+ ctx.fillStyle="#654321";
+ ctx.fillRect(0,260,800,40);
+}
+
+
+/* ---------- АНИМАЦИИ ---------- */
+
+function updateAnim(){
+
+ if(player.animTimer>0){
+
+  player.animTimer--;
+
+  if(player.action==="jump"){
+   player.y=player.baseY-40;
+  }
+
+  if(player.action==="flip"){
+
+   player.y=player.baseY-55;
+
+   player.rotation+=Math.PI/20; // 90-180-270-360
+  }
+
+ }else{
+
+  player.y=player.baseY;
+
+  player.action="run";
+  player.rotation=0;
+ }
+}
+
+
+/* ---------- ИГРОК ---------- */
+
+function drawPlayer(){
+
+ updateAnim();
+
+ ctx.save();
+
+
+ ctx.translate(
+  player.x+20,
+  player.y+30
+ );
+
+ ctx.rotate(player.rotation);
+
+ ctx.translate(-20,-30);
+
+
+ // Голова
+ ctx.fillStyle="#ffe0bd";
+ ctx.fillRect(10,0,20,20);
+
+
+ // Пальто
+ ctx.fillStyle="brown";
+ ctx.fillRect(0,20,40,40);
+
+
+ // Рюкзак
+ ctx.fillStyle="darkblue";
+ ctx.fillRect(-10,25,10,25);
+
+
+ // Шляпа
+ ctx.fillStyle="black";
+ ctx.fillRect(5,-5,30,5);
+ ctx.fillRect(12,-15,15,10);
+
+
+ // РУКА (всегда)
+ ctx.fillStyle="orange";
+
+ if(player.action==="hit"){
+
+  // большая рука
+  ctx.fillRect(35,25,25,10);
+
+ }else{
+
+  // опущена
+  ctx.fillRect(32,35,8,15);
+ }
+
+
+ // НОГА
+ if(player.action==="kick"){
+
+  ctx.fillStyle="#ffe0bd";
+
+  ctx.fillRect(30,55,25,8);
+
+ }
+
+
+ ctx.restore();
+}
+
+
+/* ---------- ПРЕПЯТСТВИЯ ---------- */
+
+function drawObstacle(){
+
+ if(!obstacle) return;
+
+
+ // ЛАВА
+ if(obstacle.type==="lava"){
+
+  ctx.fillStyle="red";
+  ctx.fillRect(obstacle.x,240,40,20);
+
+  ctx.font="26px Arial";
+  ctx.fillText("🔥🔥",obstacle.x-2,255);
+ }
+
+
+ // КАКТУС
+ if(obstacle.type==="cactus"){
+  ctx.font = "50px Arial"; // увеличили размер шрифта
+  ctx.fillText("🌵", obstacle.x+2, 260); // поправил y, чтобы стоял на земле
+ }
+
+
+ // СТЕНА
+ if(obstacle.type==="wall"){
+
+  ctx.fillStyle="gray";
+  ctx.fillRect(obstacle.x,190,40,70);
+
+  ctx.fillStyle="darkgray";
+
+  for(let i=0;i<5;i++){
+   ctx.fillRect(obstacle.x,i*14+190,40,2);
+  }
+ }
+
+
+ // ОБРЫВ (цвет пустыни)
+ if(obstacle.type==="gap"){
+
+  ctx.fillStyle="#d2b55b";
+  ctx.fillRect(obstacle.x,260,40,40);
+
+  ctx.fillStyle="#00000022";
+  ctx.fillRect(obstacle.x+5,265,30,35);
+ }
+}
+
+
+/* ---------- ЦИКЛ ---------- */
+
+function update(){
+
+ drawBackground();
+ drawPlayer();
+
+
+ // Спавн
+ if(!obstacle){
+
+  if(Math.random()<0.015){
+   spawnObstacle();
+  }
+ }
+
+
+ // Движение
+ if(obstacle){
+
+  obstacle.x-=gameSpeed;
+
+
+  if(
+   obstacle.x<player.x+40 &&
+   obstacle.x+40>player.x
+  ){
+
+   if(canAct){
+
+    if(lastAction===obstacle.action){
+     success();
+    }else{
+     fail();
+    }
+   }
+  }
+
+
+  if(obstacle && obstacle.x+40<0){
+   fail();
+  }
+ }
+
+
+ drawObstacle();
+
+ updateUI();
+
+ requestAnimationFrame(update);
+}
+
+
+/* ---------- СТАРТ ---------- */
+
+update();
+
+</script>
+
+</body>
+</html>
