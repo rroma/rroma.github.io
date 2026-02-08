@@ -38,15 +38,17 @@ button {
 <canvas id="game" width="600" height="200"></canvas>
 
 <p>
-  Очки: <span id="score">0</span> |
-  Жизни: <span id="lives">❤️❤️❤️</span> |
-  Раунд: <span id="round">0</span>/20
-  </p>
+  Points: <span id="score">0</span> |
+  Health: <span id="lives">❤️❤️❤️</span> |
+  Passed: <span id="round">0</span>/20
+</p>
 <div>
 <button onclick="doAction('jump')">⬆️</button>
 <button onclick="doAction('flip')">🔄</button>
 <button onclick="doAction('hit')">👊</button>
 <button onclick="doAction('kick')">🦵</button>
+&nbsp;&nbsp;&nbsp;&nbsp;
+<button id="pauseBtn" onclick="togglePause()">⏸️</button>
 </div>
 
 <script>
@@ -65,6 +67,7 @@ let gameSpeed = 1.3;
 let obstacle = null;
 let canAct = false;
 let lastAction = null;
+let paused = false;
 
 /* ---------- ИГРОК ---------- */
 const player = {
@@ -93,6 +96,19 @@ function updateUI(){
   document.getElementById("round").textContent = roundCount;
 }
 
+function togglePause() {
+  paused = !paused;
+
+  const btn = document.getElementById("pauseBtn");
+
+  if(paused){
+    btn.textContent = "▶️"; // кнопка теперь показывает «Play»
+  } else {
+    btn.textContent = "⏸️"; // кнопка теперь показывает «Pause»
+    update(); // возобновляем цикл игры
+  }
+}
+
 /* ---------- СПАВН ---------- */
 function spawnObstacle(){
   const o = obstacles[Math.floor(Math.random() * obstacles.length)];
@@ -114,7 +130,7 @@ function doAction(a){
   if(!canAct) return;
   lastAction = a;
   player.action = a;
-  player.animTimer = 40;
+  player.animTimer = 100;
   if(a==="flip"){
     player.rotation = 0;
   }
@@ -123,10 +139,17 @@ function doAction(a){
 /* ---------- УСПЕХ ---------- */
 function success(){
   if(!obstacle) return;
+
   score += obstacle.points;
   roundCount++;
-  obstacle = null;
-  canAct = false;
+
+  // если это не яма, убираем препятствие
+  if(obstacle.type !== "gap" && obstacle.type !== "lava"){
+    obstacle = null;
+    canAct = false;
+  } else {
+    canAct = false; // игрок уже действовал, но препятствие остаётся
+  }
 
   if(roundCount >= roundGoal){
     score += 10;
@@ -269,6 +292,11 @@ function drawObstacle(){
 
 /* ---------- ЦИКЛ ---------- */
 function update(){
+  if(paused) {
+    updateUI(); // UI можно обновлять, чтобы показывать очки и жизни
+    return;     // пропускаем остальную логику
+  }
+
   drawBackground();
   drawPlayer();
 
@@ -291,8 +319,14 @@ function update(){
       }
     }
 
-    if(obstacle && obstacle.x + 40 < 0){
-      fail();
+    if(obstacle){
+      if(canAct && obstacle.x + 40 < player.x){
+        fail();
+      }
+    }
+
+    if(obstacle && obstacle.x + 40 < 0 && !canAct){
+      obstacle = null;
     }
   }
 
