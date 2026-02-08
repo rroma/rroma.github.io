@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Runner Game</title>
+<title>Boxer Mikhail</title>
 
 <style>
 body {
@@ -33,16 +33,15 @@ button {
 
 <body>
 
-<h1>🏃 Бегун</h1>
+<h1>🏃 Boxer Mikhail</h1>
+
+<canvas id="game" width="600" height="200"></canvas>
 
 <p>
-Очки: <span id="score">0</span> |
-Жизни: <span id="lives">❤️❤️❤️</span> |
-Раунд: <span id="round">0</span>/20
-</p>
-
-<canvas id="game" width="800" height="200"></canvas>
-
+  Очки: <span id="score">0</span> |
+  Жизни: <span id="lives">❤️❤️❤️</span> |
+  Раунд: <span id="round">0</span>/20
+  </p>
 <div>
 <button onclick="doAction('jump')">⬆️</button>
 <button onclick="doAction('flip')">🔄</button>
@@ -261,9 +260,9 @@ function drawObstacle(){
 
   // ОБРЫВ
   if(obstacle.type==="gap"){
-    ctx.fillStyle="#d2b55b";
+    ctx.fillStyle="#f2d16b";
     ctx.fillRect(obstacle.x, GROUND_Y, 40, 40);
-    ctx.fillStyle="#00000022";
+    ctx.fillStyle="#f2d16b";
     ctx.fillRect(obstacle.x+5,GROUND_Y + 5,30,35);
   }
 }
