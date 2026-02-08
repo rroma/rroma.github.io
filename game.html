@@ -5,7 +5,6 @@
 <title>Runner Game</title>
 
 <style>
-
 body {
   background:#222;
   color:white;
@@ -17,7 +16,7 @@ canvas {
   background:#f2d16b;
   border:2px solid white;
   display:block;
-  width: 110%;
+  width: 100%;
   margin:10px auto;
 }
 
@@ -29,7 +28,6 @@ button {
   width:70px;
   height:60px;
 }
-
 </style>
 </head>
 
@@ -43,398 +41,269 @@ button {
 Раунд: <span id="round">0</span>/20
 </p>
 
-<canvas id="game" width="800" height="300"></canvas>
+<canvas id="game" width="800" height="200"></canvas>
 
 <div>
-
 <button onclick="doAction('jump')">⬆️</button>
 <button onclick="doAction('flip')">🔄</button>
 <button onclick="doAction('hit')">👊</button>
 <button onclick="doAction('kick')">🦵</button>
-
 </div>
 
-
 <script>
-
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+/* ---------- КОНСТАНТА ДЛЯ ЗЕМЛИ ---------- */
+const GROUND_Y = 160; // уровень земли, к которому привязаны игрок и препятствия
 
 /* ---------- ДАННЫЕ ---------- */
-
-let score=0;
-let lives=3;
-
-let roundCount=0;
-const roundGoal=20;
-
-let gameSpeed=1.3;
-
-let obstacle=null;
-let canAct=false;
-let lastAction=null;
-
+let score = 0;
+let lives = 3;
+let roundCount = 0;
+const roundGoal = 20;
+let gameSpeed = 1.3;
+let obstacle = null;
+let canAct = false;
+let lastAction = null;
 
 /* ---------- ИГРОК ---------- */
-
-const player={
-
-  x:120,
-  baseY:200,
-  y:200,
-
-  w:40,
-  h:60,
-
-  action:"run",
-  animTimer:0,
-
-  rotation:0
+const player = {
+  x: 120,
+  baseY: GROUND_Y - 60, // стоим на земле, рост игрока 60px
+  y: GROUND_Y - 60,
+  w: 40,
+  h: 60,
+  action: "run",
+  animTimer: 0,
+  rotation: 0
 };
 
-
 /* ---------- ПРЕПЯТСТВИЯ ---------- */
-
-const obstacles=[
-
- {type:"lava",   action:"flip", points:4},
- {type:"gap",    action:"jump", points:2},
- {type:"cactus", action:"hit",  points:2},
- {type:"wall",   action:"kick", points:3}
-
+const obstacles = [
+  {type:"lava",   action:"flip", points:4},
+  {type:"gap",    action:"jump", points:2},
+  {type:"cactus", action:"hit",  points:2},
+  {type:"wall",   action:"kick", points:3}
 ];
 
-
 /* ---------- UI ---------- */
-
 function updateUI(){
-
- document.getElementById("score").textContent=score;
- document.getElementById("lives").textContent="❤️".repeat(lives);
- document.getElementById("round").textContent=roundCount;
+  document.getElementById("score").textContent = score;
+  document.getElementById("lives").textContent = "❤️".repeat(lives);
+  document.getElementById("round").textContent = roundCount;
 }
-
 
 /* ---------- СПАВН ---------- */
-
 function spawnObstacle(){
-
- const o=obstacles[Math.floor(Math.random()*obstacles.length)];
-
- obstacle={
-
-  x:canvas.width,
-  y:220,
-
-  w:40,
-  h:40,
-
-  type:o.type,
-  action:o.action,
-  points:o.points
- };
-
- canAct=true;
- lastAction=null;
+  const o = obstacles[Math.floor(Math.random() * obstacles.length)];
+  obstacle = {
+    x: canvas.width,
+    y: GROUND_Y - 40, // все препятствия стоят на земле, высота ~40px
+    w: 40,
+    h: 40,
+    type: o.type,
+    action: o.action,
+    points: o.points
+  };
+  canAct = true;
+  lastAction = null;
 }
-
 
 /* ---------- КНОПКИ ---------- */
-
 function doAction(a){
-
- if(!canAct) return;
-
- lastAction=a;
-
- player.action=a;
- player.animTimer=40;
-
- if(a==="flip"){
-  player.rotation=0;
- }
+  if(!canAct) return;
+  lastAction = a;
+  player.action = a;
+  player.animTimer = 40;
+  if(a==="flip"){
+    player.rotation = 0;
+  }
 }
-
 
 /* ---------- УСПЕХ ---------- */
-
 function success(){
+  if(!obstacle) return;
+  score += obstacle.points;
+  roundCount++;
+  obstacle = null;
+  canAct = false;
 
- if(!obstacle) return;
-
- score+=obstacle.points;
- roundCount++;
-
- obstacle=null;
- canAct=false;
-
- if(roundCount>=roundGoal){
-
-  score+=10;
-  roundCount=0;
-
-  alert("🎉 Раунд пройден!");
- }
+  if(roundCount >= roundGoal){
+    score += 10;
+    roundCount = 0;
+    alert("🎉 Раунд пройден!");
+  }
 }
-
 
 /* ---------- ПРОВАЛ ---------- */
-
 function fail(){
+  if(!obstacle) return;
+  lives--;
+  obstacle = null;
+  canAct = false;
+  player.action = "run";
+  player.rotation = 0;
 
- if(!obstacle) return;
-
- lives--;
-
- obstacle=null;
- canAct=false;
-
- player.action="run";
- player.rotation=0;
-
- if(lives<=0){
-
-  alert("💀 Игра окончена: "+score);
-  resetGame();
- }
+  if(lives <= 0){
+    alert("💀 Игра окончена: "+score);
+    resetGame();
+  }
 }
-
 
 /* ---------- СБРОС ---------- */
-
 function resetGame(){
-
- score=0;
- lives=3;
- roundCount=0;
-
- obstacle=null;
- canAct=false;
-
- updateUI();
+  score = 0;
+  lives = 3;
+  roundCount = 0;
+  obstacle = null;
+  canAct = false;
+  updateUI();
 }
-
 
 /* ---------- ФОН ---------- */
-
 function drawBackground(){
+  ctx.fillStyle="#f2d16b";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
- ctx.fillStyle="#f2d16b";
- ctx.fillRect(0,0,800,300);
-
- // Земля
- ctx.fillStyle="#654321";
- ctx.fillRect(0,260,800,40);
+  // Земля
+  ctx.fillStyle="#654321";
+  ctx.fillRect(0,GROUND_Y,canvas.width,canvas.height - GROUND_Y);
 }
-
 
 /* ---------- АНИМАЦИИ ---------- */
-
 function updateAnim(){
-
- if(player.animTimer>0){
-
-  player.animTimer--;
-
-  if(player.action==="jump"){
-   player.y=player.baseY-40;
+  if(player.animTimer > 0){
+    player.animTimer--;
+    if(player.action==="jump"){
+      player.y = player.baseY - 40;
+    }
+    if(player.action==="flip"){
+      player.y = player.baseY - 55;
+      player.rotation += Math.PI/20;
+    }
+  }else{
+    player.y = player.baseY;
+    player.action = "run";
+    player.rotation = 0;
   }
-
-  if(player.action==="flip"){
-
-   player.y=player.baseY-55;
-
-   player.rotation+=Math.PI/20; // 90-180-270-360
-  }
-
- }else{
-
-  player.y=player.baseY;
-
-  player.action="run";
-  player.rotation=0;
- }
 }
-
 
 /* ---------- ИГРОК ---------- */
-
 function drawPlayer(){
+  updateAnim();
+  ctx.save();
+  ctx.translate(player.x + 20, player.y + 30);
+  ctx.rotate(player.rotation);
+  ctx.translate(-20,-30);
 
- updateAnim();
-
- ctx.save();
-
-
- ctx.translate(
-  player.x+20,
-  player.y+30
- );
-
- ctx.rotate(player.rotation);
-
- ctx.translate(-20,-30);
-
-
- // Голова
- ctx.fillStyle="#ffe0bd";
- ctx.fillRect(10,0,20,20);
-
-
- // Пальто
- ctx.fillStyle="brown";
- ctx.fillRect(0,20,40,40);
-
-
- // Рюкзак
- ctx.fillStyle="darkblue";
- ctx.fillRect(-10,25,10,25);
-
-
- // Шляпа
- ctx.fillStyle="black";
- ctx.fillRect(5,-5,30,5);
- ctx.fillRect(12,-15,15,10);
-
-
- // РУКА (всегда)
- ctx.fillStyle="orange";
-
- if(player.action==="hit"){
-
-  // большая рука
-  ctx.fillRect(35,25,25,10);
-
- }else{
-
-  // опущена
-  ctx.fillRect(32,35,8,15);
- }
-
-
- // НОГА
- if(player.action==="kick"){
-
+  // Голова
   ctx.fillStyle="#ffe0bd";
+  ctx.fillRect(10,0,20,20);
 
-  ctx.fillRect(30,55,25,8);
+  // Пальто
+  ctx.fillStyle="brown";
+  ctx.fillRect(0,20,40,40);
 
- }
+  // Рюкзак
+  ctx.fillStyle="darkblue";
+  ctx.fillRect(-10,25,10,25);
 
+  // Шляпа
+  ctx.fillStyle="black";
+  ctx.fillRect(5,-5,30,5);
+  ctx.fillRect(12,-15,15,10);
 
- ctx.restore();
+  // Рука
+  ctx.fillStyle="orange";
+  if(player.action==="hit"){
+    ctx.fillRect(35,25,25,10);
+  }else{
+    ctx.fillRect(32,35,8,15);
+  }
+
+  // Нога
+  if(player.action==="kick"){
+    ctx.fillStyle="#ffe0bd";
+    ctx.fillRect(30,55,25,8);
+  }
+
+  ctx.restore();
 }
-
 
 /* ---------- ПРЕПЯТСТВИЯ ---------- */
-
 function drawObstacle(){
+  if(!obstacle) return;
 
- if(!obstacle) return;
-
-
- // ЛАВА
- if(obstacle.type==="lava"){
-
-  ctx.fillStyle="red";
-  ctx.fillRect(obstacle.x,240,40,20);
-
-  ctx.font="26px Arial";
-  ctx.fillText("🔥🔥",obstacle.x-2,255);
- }
-
-
- // КАКТУС
- if(obstacle.type==="cactus"){
-  ctx.font = "50px Arial"; // увеличили размер шрифта
-  ctx.fillText("🌵", obstacle.x+2, 260); // поправил y, чтобы стоял на земле
- }
-
-
- // СТЕНА
- if(obstacle.type==="wall"){
-
-  ctx.fillStyle="gray";
-  ctx.fillRect(obstacle.x,190,40,70);
-
-  ctx.fillStyle="darkgray";
-
-  for(let i=0;i<5;i++){
-   ctx.fillRect(obstacle.x,i*14+190,40,2);
+  // ЛАВА
+  if(obstacle.type==="lava"){
+    ctx.fillStyle="red";
+    ctx.fillRect(obstacle.x, GROUND_Y - 20, 40, 20);
+    ctx.font="26px Arial";
+    ctx.fillText("🔥🔥", obstacle.x-2, GROUND_Y - 5);
   }
- }
 
+  // КАКТУС
+  if(obstacle.type==="cactus"){
+    ctx.font = "50px Arial";
+    ctx.fillText("🌵", obstacle.x+2, GROUND_Y); // стоит на земле
+  }
 
- // ОБРЫВ (цвет пустыни)
- if(obstacle.type==="gap"){
+  // СТЕНА
+  if(obstacle.type==="wall"){
+    ctx.fillStyle="gray";
+    ctx.fillRect(obstacle.x, GROUND_Y - 70, 40, 70);
+    ctx.fillStyle="darkgray";
+    for(let i=0;i<5;i++){
+      ctx.fillRect(obstacle.x, i*14 + (GROUND_Y - 70), 40,2);
+    }
+  }
 
-  ctx.fillStyle="#d2b55b";
-  ctx.fillRect(obstacle.x,260,40,40);
-
-  ctx.fillStyle="#00000022";
-  ctx.fillRect(obstacle.x+5,265,30,35);
- }
+  // ОБРЫВ
+  if(obstacle.type==="gap"){
+    ctx.fillStyle="#d2b55b";
+    ctx.fillRect(obstacle.x, GROUND_Y, 40, 40);
+    ctx.fillStyle="#00000022";
+    ctx.fillRect(obstacle.x+5,GROUND_Y + 5,30,35);
+  }
 }
-
 
 /* ---------- ЦИКЛ ---------- */
-
 function update(){
+  drawBackground();
+  drawPlayer();
 
- drawBackground();
- drawPlayer();
-
-
- // Спавн
- if(!obstacle){
-
-  if(Math.random()<0.015){
-   spawnObstacle();
+  // Спавн
+  if(!obstacle && Math.random()<0.015){
+    spawnObstacle();
   }
- }
 
+  // Движение
+  if(obstacle){
+    obstacle.x -= gameSpeed;
 
- // Движение
- if(obstacle){
-
-  obstacle.x-=gameSpeed;
-
-
-  if(
-   obstacle.x<player.x+40 &&
-   obstacle.x+40>player.x
-  ){
-
-   if(canAct){
-
-    if(lastAction===obstacle.action){
-     success();
-    }else{
-     fail();
+    if(obstacle.x < player.x + 40 && obstacle.x + 40 > player.x){
+      if(canAct){
+        if(lastAction===obstacle.action){
+          success();
+        }else{
+          fail();
+        }
+      }
     }
-   }
+
+    if(obstacle && obstacle.x + 40 < 0){
+      fail();
+    }
   }
 
-
-  if(obstacle && obstacle.x+40<0){
-   fail();
-  }
- }
-
-
- drawObstacle();
-
- updateUI();
-
- requestAnimationFrame(update);
+  drawObstacle();
+  updateUI();
+  requestAnimationFrame(update);
 }
 
-
 /* ---------- СТАРТ ---------- */
-
 update();
-
 </script>
 
 </body>
