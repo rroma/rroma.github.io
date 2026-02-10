@@ -97,8 +97,14 @@ let lastAction = null;
 
 let paused = false;
 
+let flashTime = 0;
+const FLASH_DURATION = 10; 
+
 let darkness = 0;
 let stars = [];
+
+let groundOffset = 0;
+
 
 // GROUND
 
@@ -265,6 +271,8 @@ function fail(){
 
   lives--;
 
+  flashTime = FLASH_DURATION;
+
   obstacle=null;
   canAct=false;
 
@@ -371,17 +379,20 @@ function drawGround() {
   ctx.fillStyle = "#654321";
   ctx.fillRect(0, GROUND_Y, canvas.width, 40);
 
-  /*
-  for(let spot of groundTexture){
+  // Draw permanent texture spots with offset
+  for (let spot of groundTexture){
+    let x = (spot.x + groundOffset) % canvas.width;
+    if (x < 0) x += canvas.width; // wrap around
     ctx.fillStyle = spot.color;
-    ctx.fillRect(spot.x, spot.y, spot.w, spot.h);
+    ctx.fillRect(x, spot.y, spot.w, spot.h);
   }
 
-  for(let stripe of groundStripes){
+  // Draw stripes with offset
+  for (let stripe of groundStripes){
+    let y = stripe.y;
     ctx.fillStyle = stripe.color;
-    ctx.fillRect(0, stripe.y, canvas.width, 2);
+    ctx.fillRect(0, y, canvas.width, 2);
   }
-  */
 }
 
 
@@ -398,6 +409,12 @@ function drawBackground(){
     ctx.fillStyle=`rgba(${NIGHT_COLOR},${darkness})`;
     ctx.fillRect(0,0,canvas.width,canvas.height);
   }
+
+  //if(flashTime > 0){
+  //  ctx.fillStyle = `rgba(255,0,0,0.4)`; // semi-transparent red
+  //  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  //  flashTime--;
+  //}
 
   drawSun();
 
@@ -549,6 +566,9 @@ function update(){
 
   if(paused) return;
 
+  groundOffset -= GAME_SPEED;
+    if (groundOffset < -canvas.width) groundOffset = 0;
+
   updateDarkness();
 
   drawBackground();
@@ -590,6 +610,8 @@ function update(){
 
 
   drawObstacle();
+
+
   updateUI();
 
   requestAnimationFrame(update);
