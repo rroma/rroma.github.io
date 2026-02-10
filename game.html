@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>🏃 Mikhail Play</title>
@@ -13,10 +13,9 @@ body {
 }
 
 canvas {
-  background:#f2d16b;
   border:2px solid white;
   display:block;
-  width: 100%;
+  width:100%;
   margin:10px auto;
 }
 
@@ -38,213 +37,436 @@ button {
 <canvas id="game" width="600" height="200"></canvas>
 
 <p>
-  Points: <span id="score">0</span> |
-  Health: <span id="lives">❤️❤️❤️</span> |
-  Passed: <span id="round">0</span>/20
+Points: <span id="score">0</span> |
+Best Score: <span id="best">0</span> |
+Health: <span id="lives">❤️❤️❤️</span> |
+Passed: <span id="round">0</span>/24 |
+Mood: <span id="mood">Day</span>
 </p>
+
 <div>
 <button onclick="doAction('jump')">⬆️</button>
 <button onclick="doAction('flip')">🔄</button>
 <button onclick="doAction('hit')">👊</button>
 <button onclick="doAction('kick')">🦵</button>
-&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <button id="pauseBtn" onclick="togglePause()">⏸️</button>
 </div>
 
 <script>
+
+/* ================= CONSTANTS ================= */
+
+const GROUND_Y = 160;
+
+const ROUND_SIZE = 24;
+const NIGHT_START = 7;
+const SUNRISE_START = 16;
+const DAY_RESET = 20;
+
+const GAME_SPEED = 1.4;
+const SPAWN_RATE = 0.015;
+
+const PLAYER_H = 60;
+const PLAYER_W = 40;
+
+const ANIM_TIME = 100;
+
+const MAX_DARK = 0.9;
+
+const NIGHT_COLOR = '15, 25, 60';
+
+
+/* ================= CANVAS ================= */
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-/* ---------- КОНСТАНТА ДЛЯ ЗЕМЛИ ---------- */
-const GROUND_Y = 160; // уровень земли, к которому привязаны игрок и препятствия
 
-/* ---------- ДАННЫЕ ---------- */
+/* ================= DATA ================= */
+
 let score = 0;
+let best = Number(localStorage.getItem("bestScore")) || 0;
+
 let lives = 3;
-let roundCount = 0;
-const roundGoal = 20;
-let gameSpeed = 1.3;
+let round = 0;
+
 let obstacle = null;
 let canAct = false;
 let lastAction = null;
+
 let paused = false;
 
-/* ---------- ИГРОК ---------- */
+let darkness = 0;
+let stars = [];
+
+// GROUND
+
+const groundTexture = [];
+
+for(let i = 0; i < 150; i++){
+  groundTexture.push({
+    x: Math.random() * canvas.width,
+    y: GROUND_Y + Math.random() * 40,
+    w: Math.random() * 4 + 1,
+    h: Math.random() * 4 + 1,
+    color: "rgba(0,0,0,0.2)"
+  });
+}
+
+// Optional stripes (also permanent)
+const groundStripes = [];
+for(let y = GROUND_Y; y < GROUND_Y + 40; y += 4){
+  groundStripes.push({
+    y: y,
+    color: `rgba(0,0,0,${Math.random() * 0.05})`
+  });
+}
+
+
+/* ================= STARS ================= */
+
+for(let i=0;i<40;i++){
+  stars.push({
+    x:Math.random()*canvas.width,
+    y:Math.random()*(GROUND_Y-20),
+    r:Math.random()*1.5+0.5
+  });
+}
+
+
+/* ================= PLAYER ================= */
+
+
 const player = {
-  x: 120,
-  baseY: GROUND_Y - 60, // стоим на земле, рост игрока 60px
-  y: GROUND_Y - 60,
-  w: 40,
-  h: 60,
-  action: "run",
-  animTimer: 0,
-  rotation: 0
+
+  x:120,
+
+  baseY:GROUND_Y-PLAYER_H,
+  y:GROUND_Y-PLAYER_H,
+
+  w:PLAYER_W,
+  h:PLAYER_H,
+
+  action:"run",
+  anim:0,
+  rot:0
 };
 
-/* ---------- ПРЕПЯТСТВИЯ ---------- */
+
+/* ================= OBSTACLES ================= */
+
 const obstacles = [
-  {type:"lava",   action:"flip", points:4},
-  {type:"gap",    action:"jump", points:2},
-  {type:"cactus", action:"hit",  points:2},
-  {type:"wall",   action:"kick", points:3}
+  {type:"lava",action:"flip",points:4},
+  {type:"gap",action:"jump",points:2},
+  {type:"cactus",action:"hit",points:2},
+  {type:"wall",action:"kick",points:3}
 ];
 
-/* ---------- UI ---------- */
+
+/* ================= UI ================= */
+
 function updateUI(){
+
   document.getElementById("score").textContent = score;
+  document.getElementById("best").textContent = best;
   document.getElementById("lives").textContent = "❤️".repeat(lives);
-  document.getElementById("round").textContent = roundCount;
+  document.getElementById("round").textContent = round;
+
+  let mood="Day";
+
+  if(round>=NIGHT_START && round<SUNRISE_START) mood="Night";
+  else if(round>=SUNRISE_START && round<DAY_RESET) mood="Sunrise";
+
+  document.getElementById("mood").textContent = mood;
 }
 
-function togglePause() {
-  paused = !paused;
 
-  const btn = document.getElementById("pauseBtn");
+/* ================= PAUSE ================= */
 
-  if(paused){
-    btn.textContent = "▶️"; // кнопка теперь показывает «Play»
-  } else {
-    btn.textContent = "⏸️"; // кнопка теперь показывает «Pause»
-    update(); // возобновляем цикл игры
-  }
+function togglePause(){
+
+  paused=!paused;
+
+  document.getElementById("pauseBtn").textContent =
+    paused?"▶️":"⏸️";
+
+  if(!paused) update();
 }
 
-/* ---------- СПАВН ---------- */
+
+/* ================= SPAWN ================= */
+
 function spawnObstacle(){
-  const o = obstacles[Math.floor(Math.random() * obstacles.length)];
-  obstacle = {
-    x: canvas.width,
-    y: GROUND_Y - 40, // все препятствия стоят на земле, высота ~40px
-    w: 40,
-    h: 40,
-    type: o.type,
-    action: o.action,
-    points: o.points
+
+  const o = obstacles[Math.floor(Math.random()*obstacles.length)];
+
+  obstacle={
+    x:canvas.width,
+    y:GROUND_Y-40,
+    w:40,
+    h:40,
+
+    type:o.type,
+    action:o.action,
+    points:o.points
   };
-  canAct = true;
-  lastAction = null;
+
+  canAct=true;
+  lastAction=null;
 }
 
-/* ---------- КНОПКИ ---------- */
+
+/* ================= INPUT ================= */
+
 function doAction(a){
+
   if(!canAct) return;
-  lastAction = a;
-  player.action = a;
-  player.animTimer = 100;
-  if(a==="flip"){
-    player.rotation = 0;
-  }
+
+  lastAction=a;
+
+  player.action=a;
+  player.anim=ANIM_TIME;
+
+  if(a==="flip") player.rot=0;
 }
 
-/* ---------- УСПЕХ ---------- */
+
+/* ================= SUCCESS ================= */
+
 function success(){
+
   if(!obstacle) return;
 
-  score += obstacle.points;
-  roundCount++;
+  score+=obstacle.points;
+  round++;
 
-  // если это не яма, убираем препятствие
-  if(obstacle.type !== "gap" && obstacle.type !== "lava"){
-    obstacle = null;
-    canAct = false;
-  } else {
-    canAct = false; // игрок уже действовал, но препятствие остаётся
+  if(score>best){
+    best=score;
+    localStorage.setItem("bestScore",best);
   }
 
-  if(roundCount >= roundGoal){
-    score += 10;
-    roundCount = 0;
-    alert("🎉 Раунд пройден!");
+  // Only remove cactus & wall
+  if(obstacle.type!=="gap" && obstacle.type!=="lava"){
+    obstacle=null;
   }
+
+  canAct=false;
+
+  if(round>=ROUND_SIZE) round=0;
 }
 
-/* ---------- ПРОВАЛ ---------- */
+
+/* ================= FAIL ================= */
+
 function fail(){
-  if(!obstacle) return;
-  lives--;
-  obstacle = null;
-  canAct = false;
-  player.action = "run";
-  player.rotation = 0;
 
-  if(lives <= 0){
-    alert("💀 Игра окончена: "+score);
-    resetGame();
+  if(!obstacle) return;
+
+  lives--;
+
+  obstacle=null;
+  canAct=false;
+
+  player.action="run";
+  player.rot=0;
+
+  if(lives<=0){
+
+    alert("Game Over: "+score);
+
+    score=0;
+    lives=3;
+    round=0;
   }
 }
 
-/* ---------- СБРОС ---------- */
-function resetGame(){
-  score = 0;
-  lives = 3;
-  roundCount = 0;
-  obstacle = null;
-  canAct = false;
-  updateUI();
+
+/* ================= NIGHT SYSTEM ================= */
+
+function updateDarkness(){
+
+  if(round>=NIGHT_START && round<SUNRISE_START){
+
+    darkness+=0.005;
+    if(darkness>MAX_DARK) darkness=MAX_DARK;
+  }
+
+  else if(round>=SUNRISE_START && round<DAY_RESET){
+
+    darkness-=0.005;
+    if(darkness<0) darkness=0;
+  }
+
+  else{
+
+    darkness=0;
+  }
 }
 
-/* ---------- ФОН ---------- */
+
+/* ================= BACKGROUND ================= */
+
+function drawStars(){
+
+  if(darkness<0.2) return;
+
+  ctx.fillStyle=`rgba(224, 224, 224, ${darkness}`;
+
+  for(let s of stars){
+
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawMoon() {
+  if(darkness < 0.2) return; // Only show moon at night
+
+  const moonX = canvas.width - 80; // Position from the right
+  const moonY = 60;                // Position from the top
+  const moonRadius = 22;
+
+  // Moon body
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 255, 210, ${darkness})`; // Fades in with night
+  ctx.fill();
+}
+
+function drawSun() {
+  if(darkness > 0.2) return; // Only show sun during day
+
+  const sunX = 0;   // Left side
+  const sunY = 0;   // Top
+  const sunRadius = 40;
+
+  // Sun body
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 220, 0, ${1 - darkness})`; // Fades out as night comes
+  ctx.fill();
+
+  const numRays = 40;       // More rays
+  const innerRadius = sunRadius + 2;  // Closer to sun
+  const outerRadius = sunRadius + 30; // Shorter rays
+
+  for(let i = 0; i < numRays; i++){
+    const angle = (Math.PI * 2 / numRays) * i;
+    const x1 = sunX + Math.cos(angle) * innerRadius;
+    const y1 = sunY + Math.sin(angle) * innerRadius;
+    const x2 = sunX + Math.cos(angle) * outerRadius;
+    const y2 = sunY + Math.sin(angle) * outerRadius;
+    ctx.strokeStyle = `rgba(255, 220, 0, ${1 - darkness})`;
+    ctx.lineWidth = 0.25; // Thinner rays
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+}
+
+function drawGround() {
+  ctx.fillStyle = "#654321";
+  ctx.fillRect(0, GROUND_Y, canvas.width, 40);
+
+  /*
+  for(let spot of groundTexture){
+    ctx.fillStyle = spot.color;
+    ctx.fillRect(spot.x, spot.y, spot.w, spot.h);
+  }
+
+  for(let stripe of groundStripes){
+    ctx.fillStyle = stripe.color;
+    ctx.fillRect(0, stripe.y, canvas.width, 2);
+  }
+  */
+}
+
+
 function drawBackground(){
+
+  // Day base
   ctx.fillStyle="#f2d16b";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // Земля
-  ctx.fillStyle="#654321";
-  ctx.fillRect(0,GROUND_Y,canvas.width,canvas.height - GROUND_Y);
+
+  // Night overlay
+  if(darkness>0){
+
+    ctx.fillStyle=`rgba(${NIGHT_COLOR},${darkness})`;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+
+  drawSun();
+
+  drawStars();
+
+  drawMoon();
+
+  drawGround();
 }
 
-/* ---------- АНИМАЦИИ ---------- */
+
+/* ================= ANIM ================= */
+
 function updateAnim(){
-  if(player.animTimer > 0){
-    player.animTimer--;
-    if(player.action==="jump"){
-      player.y = player.baseY - 40;
-    }
+
+  if(player.anim>0){
+
+    player.anim--;
+
+    if(player.action==="jump")
+      player.y=player.baseY-40;
+
     if(player.action==="flip"){
-      player.y = player.baseY - 55;
-      player.rotation += Math.PI/20;
+
+      player.y=player.baseY-55;
+      player.rot+=Math.PI/20;
     }
+
   }else{
-    player.y = player.baseY;
-    player.action = "run";
-    player.rotation = 0;
+
+    player.y=player.baseY;
+    player.action="run";
+    player.rot=0;
   }
 }
 
-/* ---------- ИГРОК ---------- */
+
+/* ================= PLAYER DRAW ================= */
+
 function drawPlayer(){
+
   updateAnim();
+
   ctx.save();
-  ctx.translate(player.x + 20, player.y + 30);
-  ctx.rotate(player.rotation);
+
+  ctx.translate(player.x+20,player.y+30);
+  ctx.rotate(player.rot);
   ctx.translate(-20,-30);
 
-  // Голова
   ctx.fillStyle="#ffe0bd";
   ctx.fillRect(10,0,20,20);
 
-  // Пальто
   ctx.fillStyle="brown";
   ctx.fillRect(0,20,40,40);
 
-  // Рюкзак
   ctx.fillStyle="darkblue";
   ctx.fillRect(-10,25,10,25);
 
-  // Шляпа
   ctx.fillStyle="black";
   ctx.fillRect(5,-5,30,5);
   ctx.fillRect(12,-15,15,10);
 
-  // Рука
   ctx.fillStyle="orange";
-  if(player.action==="hit"){
-    ctx.fillRect(35,25,25,10);
-  }else{
-    ctx.fillRect(32,35,8,15);
-  }
 
-  // Нога
+  if(player.action==="hit")
+    ctx.fillRect(35,25,25,10);
+  else
+    ctx.fillRect(32,35,8,15);
+
   if(player.action==="kick"){
     ctx.fillStyle="#ffe0bd";
     ctx.fillRect(30,55,25,8);
@@ -253,91 +475,131 @@ function drawPlayer(){
   ctx.restore();
 }
 
-/* ---------- ПРЕПЯТСТВИЯ ---------- */
+
+/* ================= OBSTACLE DRAW ================= */
+
 function drawObstacle(){
+
   if(!obstacle) return;
 
-  // ЛАВА
+
+  // Lava
   if(obstacle.type==="lava"){
-    ctx.fillStyle="red";
-    ctx.fillRect(obstacle.x, GROUND_Y - 20, 40, 20);
-    ctx.font="26px Arial";
-    ctx.fillText("🔥🔥", obstacle.x-2, GROUND_Y - 5);
+
+    ctx.fillStyle = "red";
+    ctx.fillRect(obstacle.x, GROUND_Y, 80, 40); // same height as ground
+
+    // Draw lava flames
+    ctx.font = "24px Arial";
+    ctx.fillText("🔥🔥🔥", obstacle.x + 2, GROUND_Y - 5);
+    ctx.fillText("🔥🔥🔥", obstacle.x + 2, GROUND_Y + 10);
+    ctx.fillText("🔥🔥🔥", obstacle.x + 2, GROUND_Y + 25);
+    ctx.fillText("🔥🔥🔥", obstacle.x + 2, GROUND_Y + 40);
+
+    // Optional: add slight glow around lava
+    ctx.fillStyle = "rgba(255,100,0,0.3)";
+    ctx.fillRect(obstacle.x, GROUND_Y, 80, 40);
   }
 
-  // КАКТУС
+
+  // Cactus
   if(obstacle.type==="cactus"){
-    ctx.font = "50px Arial";
-    ctx.fillText("🌵", obstacle.x+2, GROUND_Y); // стоит на земле
+
+    ctx.font="50px Arial";
+    ctx.fillText("🌵",obstacle.x,GROUND_Y);
   }
 
-  // СТЕНА
+
+  // Wall
   if(obstacle.type==="wall"){
+
     ctx.fillStyle="gray";
-    ctx.fillRect(obstacle.x, GROUND_Y - 70, 40, 70);
+    ctx.fillRect(obstacle.x,GROUND_Y-70,40,70);
+
     ctx.fillStyle="darkgray";
+
     for(let i=0;i<5;i++){
-      ctx.fillRect(obstacle.x, i*14 + (GROUND_Y - 70), 40,2);
+      ctx.fillRect(
+        obstacle.x,
+        GROUND_Y-70+i*14,
+        40,2
+      );
     }
   }
 
-  // ОБРЫВ
+
+  // Gap (same as background)
   if(obstacle.type==="gap"){
+
     ctx.fillStyle="#f2d16b";
-    ctx.fillRect(obstacle.x, GROUND_Y, 40, 40);
-    ctx.fillStyle="#f2d16b";
-    ctx.fillRect(obstacle.x+5,GROUND_Y + 5,30,35);
+    ctx.fillRect(obstacle.x,GROUND_Y,40,40);
+
+    if(darkness>0){
+
+      ctx.fillStyle=`rgba(15,25,60,${darkness})`;
+      ctx.fillRect(obstacle.x,GROUND_Y,40,40);
+    }
   }
 }
 
-/* ---------- ЦИКЛ ---------- */
+
+/* ================= LOOP ================= */
+
 function update(){
-  if(paused) {
-    updateUI(); // UI можно обновлять, чтобы показывать очки и жизни
-    return;     // пропускаем остальную логику
-  }
+
+  if(paused) return;
+
+  updateDarkness();
 
   drawBackground();
   drawPlayer();
 
-  // Спавн
-  if(!obstacle && Math.random()<0.015){
+
+  if(!obstacle && Math.random()<SPAWN_RATE){
     spawnObstacle();
   }
 
-  // Движение
+
   if(obstacle){
-    obstacle.x -= gameSpeed;
 
-    if(obstacle.x < player.x + 40 && obstacle.x + 40 > player.x){
+    obstacle.x-=GAME_SPEED;
+
+
+    if(
+      obstacle.x<player.x+40 &&
+      obstacle.x+40>player.x
+    ){
+
       if(canAct){
-        if(lastAction===obstacle.action){
+
+        if(lastAction===obstacle.action)
           success();
-        }else{
+        else
           fail();
-        }
       }
     }
 
-    if(obstacle){
-      if(canAct && obstacle.x + 40 < player.x){
-        fail();
-      }
-    }
 
-    if(obstacle && obstacle.x + 40 < 0 && !canAct){
-      obstacle = null;
+    // Remove only when fully gone
+    if(obstacle && obstacle.x+40<0){
+
+      obstacle=null;
+      canAct=false;
     }
   }
 
+
   drawObstacle();
   updateUI();
+
   requestAnimationFrame(update);
 }
 
-/* ---------- СТАРТ ---------- */
-update();
-</script>
 
+/* ================= START ================= */
+
+update();
+
+</script>
 </body>
 </html>
