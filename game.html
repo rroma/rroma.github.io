@@ -98,7 +98,7 @@ let lastAction = null;
 let paused = false;
 
 let flashTime = 0;
-const FLASH_DURATION = 10; 
+//const FLASH_DURATION = 10; 
 
 let darkness = 0;
 let stars = [];
@@ -122,12 +122,12 @@ for(let i = 0; i < 150; i++){
 
 // Optional stripes (also permanent)
 const groundStripes = [];
-for(let y = GROUND_Y; y < GROUND_Y + 40; y += 4){
-  groundStripes.push({
-    y: y,
-    color: `rgba(0,0,0,${Math.random() * 0.05})`
-  });
-}
+//for(let y = GROUND_Y; y < GROUND_Y + 40; y += 4){
+//  groundStripes.push({
+//    y: y,
+//    color: `rgba(0,0,0,${Math.random() * 0.05})`
+//  });
+//}
 
 
 /* ================= STARS ================= */
@@ -271,7 +271,7 @@ function fail(){
 
   lives--;
 
-  flashTime = FLASH_DURATION;
+  //flashTime = FLASH_DURATION;
 
   obstacle=null;
   canAct=false;
@@ -522,7 +522,7 @@ function drawObstacle(){
   // Cactus
   if(obstacle.type==="cactus"){
 
-    ctx.font="50px Arial";
+    ctx.font="50px 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', Arial";
     ctx.fillText("🌵",obstacle.x,GROUND_Y);
   }
 
@@ -610,7 +610,6 @@ function update(){
 
 
   drawObstacle();
-
 
   updateUI();
 
