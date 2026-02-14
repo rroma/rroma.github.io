@@ -105,11 +105,14 @@ let stars = [];
 
 let groundOffset = 0;
 
+const bgImage = new Image();
+bgImage.src = "bg.jpg";
+let bgX = 0;
 
 // GROUND
 
 const groundTexture = [];
-
+/*
 for(let i = 0; i < 150; i++){
   groundTexture.push({
     x: Math.random() * canvas.width,
@@ -119,7 +122,7 @@ for(let i = 0; i < 150; i++){
     color: "rgba(0,0,0,0.2)"
   });
 }
-
+*/
 // Optional stripes (also permanent)
 const groundStripes = [];
 //for(let y = GROUND_Y; y < GROUND_Y + 40; y += 4){
@@ -398,9 +401,28 @@ function drawGround() {
 
 function drawBackground(){
 
-  // Day base
-  ctx.fillStyle="#f2d16b";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(bgImage.complete){
+    ctx.drawImage(
+      bgImage,
+      bgX,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    ctx.drawImage(
+      bgImage,
+      bgX + canvas.width,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    }else{
+
+    ctx.fillStyle="#f2d16b";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
 
 
   // Night overlay
@@ -548,14 +570,32 @@ function drawObstacle(){
   // Gap (same as background)
   if(obstacle.type==="gap"){
 
-    ctx.fillStyle="#f2d16b";
-    ctx.fillRect(obstacle.x,GROUND_Y,40,40);
+    
+    ctx.drawImage(
+      bgImage,
+
+      // источник (из картинки)
+      obstacle.x * (bgImage.width / canvas.width),
+      GROUND_Y * (bgImage.height / canvas.height),
+      40 * (bgImage.width / canvas.width),
+      40 * (bgImage.height / canvas.height),
+
+      // куда на canvas
+      obstacle.x,
+      GROUND_Y,
+      40,
+      40
+    );
 
     if(darkness>0){
-
       ctx.fillStyle=`rgba(15,25,60,${darkness})`;
       ctx.fillRect(obstacle.x,GROUND_Y,40,40);
     }
+
+    /*
+    ctx.fillStyle="#f2d16b";
+    ctx.fillRect(obstacle.x,GROUND_Y,40,40);
+    */
   }
 }
 
@@ -565,6 +605,12 @@ function drawObstacle(){
 function update(){
 
   if(paused) return;
+
+  bgX -= GAME_SPEED * 0.5; // скорость фона (медленнее земли)
+
+  if(bgX <= -canvas.width){
+    bgX = 0;
+  }
 
   groundOffset -= GAME_SPEED;
     if (groundOffset < -canvas.width) groundOffset = 0;
