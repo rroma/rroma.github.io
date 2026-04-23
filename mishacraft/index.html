@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="initial-scale=1, width=device-width, height=device-height, viewport-fit=cover">
+<title>Mini Minecraft</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; background: #000; }
+
+#crosshair {
+    position: fixed; top: 50%; left: 50%;
+    width: 14px; height: 14px; margin: -7px 0 0 -7px;
+    pointer-events: none;
+}
+#crosshair::before, #crosshair::after {
+    content: ""; position: absolute; background: rgba(255,255,255,0.85);
+}
+#crosshair::before { width: 2px; height: 14px; left: 6px; top: 0; }
+#crosshair::after  { width: 14px; height: 2px; left: 0; top: 6px; }
+
+#hud {
+    position: fixed; top: 10px; left: 10px;
+    color: #fff; font-family: monospace; font-size: 13px;
+    text-shadow: 1px 1px 3px #000; pointer-events: none; line-height: 1.7;
+}
+#fps {
+    position: fixed; top: 10px; right: 14px;
+    color: #0f0; font-family: monospace; font-size: 15px; font-weight: bold;
+    text-shadow: 1px 1px 3px #000; pointer-events: none;
+}
+#inventory {
+    position: fixed; bottom: 16px; left: 50%;
+    transform: translateX(-50%); display: flex; gap: 6px;
+    background: rgba(0,0,0,0.55); padding: 6px 8px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.slot {
+    position: relative;
+    width: 52px; height: 52px;
+    border: 2px solid rgba(255,255,255,0.25); border-radius: 6px;
+    cursor: pointer; overflow: visible;
+    background: rgba(0,0,0,0.4);
+    transition: border-color .1s, transform .1s;
+}
+.slot canvas { display: block; width: 52px; height: 52px; border-radius: 4px; }
+.slot:hover { border-color: rgba(255,255,255,0.7); transform: translateY(-2px); }
+.slot.active {
+    border-color: #ffe033 !important;
+    box-shadow: 0 0 0 2px #ffe03366, 0 0 14px #ffe03388;
+    transform: translateY(-3px);
+}
+.slot .badge {
+    position: absolute; bottom: 2px; right: 4px;
+    font-family: 'Courier New', monospace; font-size: 11px; font-weight: bold;
+    color: #fff; text-shadow: 0 0 3px #000, 1px 1px 0 #000;
+    pointer-events: none; line-height: 1;
+}
+
+#underwater {
+    position: fixed; inset: 0;
+    background: rgba(0,50,160,0.38); pointer-events: none; display: none;
+}
+#lava-overlay {
+    position: fixed; inset: 0;
+    background: rgba(255,80,0,0.7); pointer-events: none; display: none;
+}
+#loading {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.7); font-family: monospace; font-size: 12px;
+    pointer-events: none;
+}
+/* ─── МОБИЛЬНЫЕ КОНТРОЛЫ ─────────────────────────────────────────────── */
+#mobile-controls { display: none; }
+
+@media (pointer: coarse) {
+    #mobile-controls { display: block; }
+}
+
+/* Джойстик — левый нижний угол */
+#joystick-zone {
+    position: fixed; left: 24px; bottom: 90px;
+    width: 130px; height: 130px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,255,255,0.18);
+    touch-action: none;
+}
+#joystick-knob {
+    position: absolute;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.35);
+    border: 2px solid rgba(255,255,255,0.6);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: background .1s;
+}
+
+/* Кнопка прыжка — правый нижний угол */
+#btn-jump {
+    position: fixed; right: 28px; bottom: 110px;
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.22);
+    border: 2px solid rgba(255,255,255,0.5);
+    color: #fff; font-size: 28px; line-height: 70px; text-align: center;
+    touch-action: none; user-select: none; cursor: pointer;
+}
+#btn-jump:active { background: rgba(255,255,255,0.45); }
+
+/* Кнопки действий — сломать и поставить */
+#btn-break {
+    position: fixed; right: 110px; bottom: 110px;
+    width: 62px; height: 62px; border-radius: 50%;
+    background: rgba(220,80,60,0.35);
+    border: 2px solid rgba(255,120,100,0.7);
+    color: #fff; font-size: 22px; line-height: 62px; text-align: center;
+    touch-action: none; user-select: none; cursor: pointer;
+}
+#btn-break:active { background: rgba(220,80,60,0.7); }
+
+#btn-place {
+    position: fixed; right: 28px; bottom: 195px;
+    width: 62px; height: 62px; border-radius: 50%;
+    background: rgba(60,180,80,0.35);
+    border: 2px solid rgba(100,220,120,0.7);
+    color: #fff; font-size: 22px; line-height: 62px; text-align: center;
+    touch-action: none; user-select: none; cursor: pointer;
+}
+#btn-place:active { background: rgba(60,180,80,0.7); }
+
+/* Зона свайпа камеры — вся правая половина экрана */
+#look-zone {
+    position: fixed; right: 0; top: 0;
+    width: 50%; height: 100%;
+    touch-action: none;
+    z-index: 10;
+}
+
+/* Все кнопки поверх look-zone */
+#btn-jump, #btn-break, #btn-place, #joystick-zone {
+    z-index: 20;
+}
+</style>
+</head>
+<body>
+
+<div id="crosshair"></div>
+<div id="underwater"></div>
+<div id="lava-overlay"></div>
+<div id="hud">X: 0 &nbsp; Y: 0 &nbsp; Z: 0</div>
+<div id="fps">-- FPS</div>
+<div id="loading"></div>
+<div id="inventory">
+    <div class="slot active" data-type="grass"><canvas id="icon-grass"></canvas></div>
+    <div class="slot" data-type="stone"><canvas id="icon-stone"></canvas></div>
+    <div class="slot" data-type="wood"><canvas id="icon-wood"></canvas></div>
+    <div class="slot" data-type="leaf"><canvas id="icon-leaf"></canvas></div>
+    <div class="slot" data-type="sand"><canvas id="icon-sand"></canvas></div>
+    <div class="slot" data-type="rainbow"><canvas id="icon-rainbow"></canvas><span class="badge" id="rainbow-badge">0</span></div>
+</div>
+
+<div id="mobile-controls">
+    <div id="joystick-zone"><div id="joystick-knob"></div></div>
+    <div id="btn-jump">⬆</div>
+    <div id="btn-break">⛏</div>
+    <div id="btn-place">🧱</div>
+    <div id="look-zone"></div>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+"use strict";
+
+// ─── СЦЕНА ───────────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 80, 160);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.3, 300);
+camera.position.set(0, 20, 12);
+camera.rotation.order = "YXZ";
+
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const sun = new THREE.DirectionalLight(0xfff4cc, 1.2);
+sun.position.set(30, 60, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(512, 512);
+Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 0.5, far: 200 });
+scene.add(sun);
+
+// ─── INSTANCED MESH ──────────────────────────────────────────────────────────
+const BGEO = new THREE.BoxGeometry(1, 1, 1);
+const MAX_INST = 80000;
+
+// Радуга: одна текстура с 7 горизонтальными полосами на кубе
+const RAINBOW_COLORS = [0xff0000, 0xff7700, 0xffff00, 0x00cc00, 0x0000ff, 0x8800cc, 0xee00aa];
+function makeRainbowTexture() {
+    const size = 56; // 7 полос по 8px
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const stripeH = size / 7;
+    const hexColors = ["#ff0000","#ff7700","#ffff00","#00cc00","#0000ff","#8800cc","#ee00aa"];
+    for (let i = 0; i < 7; i++) {
+        ctx.fillStyle = hexColors[i];
+        ctx.fillRect(0, i * stripeH, size, stripeH);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+}
+
+const BLOCK_TYPES  = ["grass","stone","wood","leaf","sand","water","lava","rainbow"];
+const BLOCK_COLOR  = {
+    grass:0x4caf50, stone:0x888888, wood:0x8b5a2b, leaf:0x2e7d32, sand:0xe2c97e,
+    water:0x1565c0, lava:0xff4500, rainbow:0xffffff,
+};
+
+const iMesh = {};
+for (const t of BLOCK_TYPES) {
+    const isWater   = t === "water";
+    const isLava    = t === "lava";
+    const isRainbow = t === "rainbow";
+    const mat = new THREE.MeshLambertMaterial({
+        color: BLOCK_COLOR[t],
+        map: isRainbow ? makeRainbowTexture() : null,
+        transparent: isWater,
+        opacity: isWater ? 0.62 : 1,
+        depthWrite: !isWater,
+        polygonOffset: isWater,
+        polygonOffsetFactor: isWater ? -1 : 0,
+        polygonOffsetUnits:  isWater ? -1 : 0,
+        ...(isLava ? { emissive: new THREE.Color(0xff4500), emissiveIntensity: 0.6 } : {}),
+        ...(isRainbow ? { emissive: new THREE.Color(0x888888), emissiveIntensity: 0.3 } : {}),
+        // instanceColor будет перемножаться с основным цветом
+        vertexColors: false,
+    });
+    const im = new THREE.InstancedMesh(BGEO, mat, MAX_INST);
+    im.castShadow    = !isWater && !isRainbow;
+    im.receiveShadow = !isWater;
+    im.count = 0;
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_INST * 3).fill(1), 3);
+    im.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    im.frustumCulled = false;
+    scene.add(im);
+    iMesh[t] = im;
+}
+
+// ─── ОСВЕЩЕНИЕ ПО ГЛУБИНЕ ────────────────────────────────────────────────────
+// Яркость блока определяется двумя факторами:
+//   1. Глубина (y): чем ниже — тем темнее. y=0 → 1.0, y=-50 → 0.15
+//   2. Skylight: если над блоком есть хотя бы одна открытая ячейка до неба —
+//      блок получает бонус яркости (свет "падает сверху через шахту")
+//
+// Skylight считается через простой raycast вверх по blockMap — без тяжёлой
+// физики. Обновляется только при изменении блоков рядом с игроком.
+
+const SURFACE_Y   = 0;
+const DEEP_Y      = -50;
+const MIN_BRIGHT  = 0.38;   // было 0.12 — теперь даже в глубокой шахте видно
+const SKY_BONUS   = 0.55;   // было 0.35 — открытое небо сверху даёт много света
+const SKY_CHECK_H = 40;
+
+// Факел игрока: блоки в радиусе TORCH_R от камеры получают дополнительный свет.
+// Обновляется каждый кадр для ближайших блоков.
+const TORCH_R      = 5;     // радиус подсветки
+const TORCH_POWER  = 0.55;  // максимальная добавка от "факела"
+
+const skylightCache = new Map();
+
+function depthBrightness(y) {
+    const t = Math.max(0, Math.min(1, (y - DEEP_Y) / (SURFACE_Y - DEEP_Y)));
+    // Нелинейная кривая: у поверхности светло, глубоко — не совсем темно
+    return MIN_BRIGHT + Math.pow(t, 0.7) * (1 - MIN_BRIGHT);
+}
+
+function hasSkyAbove(x, y, z) {
+    const k = bkey(x, y, z);
+    if (skylightCache.has(k)) return skylightCache.get(k);
+    for (let cy = y + 1; cy <= y + SKY_CHECK_H; cy++) {
+        if (blockMap.has(bkey(x, cy, z))) { skylightCache.set(k, false); return false; }
+    }
+    skylightCache.set(k, true);
+    return true;
+}
+
+function blockBrightness(x, y, z) {
+    const entry = blockMap.get(bkey(x, y, z));
+    if (entry && (entry.type === "lava" || entry.type === "rainbow")) return 1.0;
+    const base = depthBrightness(y);
+    const sky  = hasSkyAbove(x, y, z) ? SKY_BONUS : 0;
+    return Math.min(1.0, base + sky);
+}
+
+// Подсветка от "факела" игрока — обновляем блоки вокруг каждые N кадров
+let torchFrame = 0;
+function updateTorchLight(px, py, pz) {
+    torchFrame++;
+    if (torchFrame % 3 !== 0) return; // не каждый кадр для производительности
+    const r = TORCH_R;
+    for (const [k, entry] of blockMap) {
+        const dx = entry.x - px, dy = entry.y - py, dz = entry.z - pz;
+        const dist2 = dx*dx + dy*dy + dz*dz;
+        if (dist2 > r*r) continue;
+        const dist = Math.sqrt(dist2);
+        // Факел: квадратичное затухание
+        const torchAdd = TORCH_POWER * Math.max(0, 1 - dist / r) ** 2;
+        const base = blockBrightness(entry.x, entry.y, entry.z);
+        const br = Math.min(1.0, base + torchAdd);
+        _brightColor.setRGB(br, br, br);
+        iMesh[entry.type].setColorAt(entry.idx, _brightColor);
+        iMesh[entry.type].instanceColor.needsUpdate = true;
+    }
+}
+
+// Применить яркость к инстансу
+const _brightColor = new THREE.Color();
+function applyBrightness(type, idx, x, y, z) {
+    const br = blockBrightness(x, y, z);
+    _brightColor.setRGB(br, br, br);
+    iMesh[type].setColorAt(idx, _brightColor);
+    iMesh[type].instanceColor.needsUpdate = true;
+}
+
+// Пересчитать skylight и цвета блоков в радиусе вокруг точки
+// (вызывается при ломании/постановке блока)
+function refreshLightAround(cx, cy, cz, radius) {
+    // Сбрасываем кэш skylight в затронутой колонке и соседних
+    for (const [k, entry] of blockMap) {
+        const dx = Math.abs(entry.x - cx);
+        const dz = Math.abs(entry.z - cz);
+        if (dx <= radius && dz <= radius) {
+            skylightCache.delete(bkey(entry.x, entry.y, entry.z));
+        }
+    }
+    // Перекрашиваем затронутые блоки
+    for (const [k, entry] of blockMap) {
+        const dx = Math.abs(entry.x - cx);
+        const dy = Math.abs(entry.y - cy);
+        const dz = Math.abs(entry.z - cz);
+        if (dx <= radius && dy <= radius + SKY_CHECK_H && dz <= radius) {
+            applyBrightness(entry.type, entry.idx, entry.x, entry.y, entry.z);
+        }
+    }
+}
+
+const _dummy = new THREE.Object3D();
+const _zero  = new THREE.Matrix4().makeScale(0, 0, 0);
+
+const blockMap = new Map();
+const waterSet = new Set();
+const lavaSet  = new Set();
+const freeList = {};
+for (const t of BLOCK_TYPES) freeList[t] = [];
+const solidEntries = new Set();
+
+let selected = "grass";
+
+function bkey(x, y, z) { return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`; }
+
+function addBlock(x, y, z, type) {
+    type = type || "grass";
+    const k = bkey(x, y, z);
+    if (blockMap.has(k)) return;
+    const im = iMesh[type];
+    if (!im) return;
+    let idx;
+    if (freeList[type].length > 0) idx = freeList[type].pop();
+    else { if (im.count >= MAX_INST) return; idx = im.count++; }
+    const rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+    _dummy.position.set(rx, ry, rz);
+    _dummy.scale.set(1, 1, 1);
+    _dummy.updateMatrix();
+    im.setMatrixAt(idx, _dummy.matrix);
+    im.instanceMatrix.needsUpdate = true;
+    const entry = { x: rx, y: ry, z: rz, type, idx };
+    blockMap.set(k, entry);
+    if (type === "water") waterSet.add(k);
+    else if (type === "lava") lavaSet.add(k);
+    else { solidEntries.add(entry); _solidDirty = true; }
+
+    // Яркость по глубине + skylight
+    applyBrightness(type, idx, rx, ry, rz);
+    // Новый блок закрывает небо снизу — инвалидируем колонку
+    skylightCache.delete(k);
+}
+
+function removeBlock(entry) {
+    const k = bkey(entry.x, entry.y, entry.z);
+    const data = blockMap.get(k);
+    if (!data) return;
+    iMesh[data.type].setMatrixAt(data.idx, _zero);
+    iMesh[data.type].instanceMatrix.needsUpdate = true;
+    freeList[data.type].push(data.idx);
+    blockMap.delete(k);
+    waterSet.delete(k);
+    lavaSet.delete(k);
+    solidEntries.delete(data);
+    _solidDirty = true;
+
+    // Пробитое отверстие открывает небо снизу — обновляем свет в колонке
+    skylightCache.delete(k);
+    // Пересчитываем блоки под удалённым (они теперь могут получить skylight)
+    refreshLightAround(data.x, data.y, data.z, 1);
+}
+
+function isSolid(x, y, z)   { const e = blockMap.get(bkey(x,y,z)); return e !== undefined && e.type !== "water" && e.type !== "lava"; }
+function isWaterAt(x, y, z) { return waterSet.has(bkey(x, y, z)); }
+function isLavaAt(x, y, z)  { return lavaSet.has(bkey(x, y, z)); }
+
+// ─── ШУМ ПЕРЛИНА ─────────────────────────────────────────────────────────────
+const perm = new Uint8Array(512);
+(() => {
+    const p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    for (let i = 255; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [p[i], p[j]] = [p[j], p[i]]; }
+    for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+})();
+function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+function lrp(a, b, t) { return a + t * (b - a); }
+function grad2(h, x, y) { const u = h < 8 ? x : y, v = h < 4 ? y : x; return ((h & 1) ? -u : u) + ((h & 2) ? -v : v); }
+function noise2(x, y) {
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+    x -= Math.floor(x); y -= Math.floor(y);
+    const u = fade(x), v = fade(y), a = perm[X] + Y, b = perm[X + 1] + Y;
+    return lrp(lrp(grad2(perm[a],     x,     y), grad2(perm[b],     x-1, y    ), u),
+               lrp(grad2(perm[a + 1], x,     y-1), grad2(perm[b+1], x-1, y-1), u), v);
+}
+function fbm(x, y, oct) {
+    let v = 0, a = 1, f = 1, s = 0;
+    for (let i = 0; i < oct; i++) { v += a * noise2(x * f, y * f); s += a; a *= 0.5; f *= 2; }
+    return v / s;
+}
+
+// ─── ГЕНЕРАЦИЯ МИРА ──────────────────────────────────────────────────────────
+const WATER_LEVEL = 0;
+const LAKE_DEPTH  = 5;
+const DEEP_LIMIT  = -50; // лава ниже этого уровня
+const RAINBOW_START_Y = -10; // радуга начинается с этой глубины
+
+const LAKES = [
+    { x:   0, z:   0, r: 12 },
+    { x:  80, z:  40, r: 16 },
+    { x: -70, z:  60, r: 10 },
+    { x:  30, z: -90, r: 14 },
+    { x: -60, z: -50, r: 18 },
+];
+
+function terrainHeight(x, z) {
+    const mountains = fbm(x * 0.008 + 5,  z * 0.008 + 5,  6) * 28;
+    const hills     = fbm(x * 0.025 + 50, z * 0.025 + 50, 4) * 8;
+    const detail    = fbm(x * 0.07  + 200, z * 0.07 + 200, 3) * 2;
+    return Math.floor(mountains + hills + detail);
+}
+
+function lakeVal(x, z) {
+    let minVal = Infinity;
+    for (const lk of LAKES) {
+        const dx = x - lk.x, dz = z - lk.z;
+        const dist = Math.sqrt(dx*dx + dz*dz) - lk.r - fbm(x*0.15 + lk.x, z*0.15 + lk.z, 4) * 6;
+        if (dist < minVal) minVal = dist;
+    }
+    return minVal;
+}
+function inLake(x, z) { return lakeVal(x, z) < 0; }
+function inSand(x, z) { return lakeVal(x, z) < 4 && !inLake(x, z); }
+
+// Псевдослучайный хэш по координатам — стабильный между кадрами
+function coordHash(x, y, z) {
+    let h = Math.round(x) * 374761393 + Math.round(y) * 1234567891 + Math.round(z) * 987654321;
+    h = ((h ^ (h >> 13)) * 1540483477) & 0x7fffffff;
+    return h;
+}
+
+// Тип блока на глубине y (подземный слой)
+function undergroundType(x, y, z) {
+    if (y <= DEEP_LIMIT) return "lava";
+    // y >= -10: верхний слой — всегда сплошной камень, никаких дыр
+    if (y >= RAINBOW_START_Y) return "stone";
+    // y < -10: камень + каждый 15-й случайный радужный
+    const h = coordHash(x, y, z);
+    if (h % 15 === 0) return "rainbow";
+    return "stone";
+}
+
+// ─── ЧАНКИ ───────────────────────────────────────────────────────────────────
+const CHUNK_SIZE  = 10;
+const RENDER_DIST = 4;
+const WORLD_LIMIT = 30;
+
+const loadedChunks = new Map();
+let buildQueue = [];
+
+function chunkKey(cx, cz) { return `${cx},${cz}`; }
+
+function generateChunk(cx, cz) {
+    const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
+    for (let dx = 0; dx < CHUNK_SIZE; dx++) {
+        for (let dz = 0; dz < CHUNK_SIZE; dz++) {
+            const x = x0 + dx, z = z0 + dz;
+            const h = terrainHeight(x, z);
+
+            if (inLake(x, z)) {
+                const bottom = Math.min(h, WATER_LEVEL - LAKE_DEPTH);
+                for (let y = DEEP_LIMIT; y < bottom; y++) addBlock(x, y, z, undergroundType(x, y, z));
+                addBlock(x, bottom, z, "sand");
+                for (let y = bottom + 1; y <= WATER_LEVEL; y++) addBlock(x, y, z, "water");
+            } else if (inSand(x, z)) {
+                const sy = Math.max(h, WATER_LEVEL + 1);
+                for (let y = DEEP_LIMIT; y < sy; y++) addBlock(x, y, z, undergroundType(x, y, z));
+                addBlock(x, sy, z, "sand");
+            } else {
+                const top = Math.max(h, WATER_LEVEL + 1);
+                for (let y = DEEP_LIMIT; y < top; y++) addBlock(x, y, z, undergroundType(x, y, z));
+                const surfaceType = top >= 18 ? "stone" : "grass";
+                addBlock(x, top, z, surfaceType);
+                if (surfaceType === "grass" && Math.random() < 0.035) {
+                    const th = 3 + (Math.random() < 0.3 ? 1 : 0);
+                    for (let y = 1; y <= th; y++) addBlock(x, top + y, z, "wood");
+                    for (let lx = -1; lx <= 1; lx++)
+                        for (let lz = -1; lz <= 1; lz++)
+                            addBlock(x + lx, top + th + 1, z + lz, "leaf");
+                    addBlock(x, top + th + 2, z, "leaf");
+                }
+            }
+        }
+    }
+    _solidDirty = true;
+}
+
+// undergroundType теперь учитывает абсолютную глубину:
+// y >= -10 (верхние 10 блоков под поверхностью) — всегда камень, без дыр
+// y < -10  — камень + каждый 15-й радужный
+// y <= DEEP_LIMIT — лава
+
+function unloadChunk(cx, cz) {
+    const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
+    for (let dx = 0; dx < CHUNK_SIZE; dx++) {
+        for (let dz = 0; dz < CHUNK_SIZE; dz++) {
+            for (let y = DEEP_LIMIT - 1; y <= 45; y++) {
+                const k = bkey(x0 + dx, y, z0 + dz);
+                const entry = blockMap.get(k);
+                if (!entry) continue;
+                iMesh[entry.type].setMatrixAt(entry.idx, _zero);
+                iMesh[entry.type].instanceMatrix.needsUpdate = true;
+                freeList[entry.type].push(entry.idx);
+                blockMap.delete(k);
+                waterSet.delete(k);
+                lavaSet.delete(k);
+                solidEntries.delete(entry);
+            }
+        }
+    }
+    _solidDirty = true;
+}
+
+function scheduleChunks(px, pz) {
+    const pcx = Math.floor(px / CHUNK_SIZE);
+    const pcz = Math.floor(pz / CHUNK_SIZE);
+    for (const [k] of loadedChunks) {
+        const [cx, cz] = k.split(",").map(Number);
+        if (Math.abs(cx - pcx) > RENDER_DIST + 1 || Math.abs(cz - pcz) > RENDER_DIST + 1) {
+            unloadChunk(cx, cz); loadedChunks.delete(k);
+        }
+    }
+    const needed = [];
+    for (let dcx = -RENDER_DIST; dcx <= RENDER_DIST; dcx++) {
+        for (let dcz = -RENDER_DIST; dcz <= RENDER_DIST; dcz++) {
+            const cx = pcx + dcx, cz = pcz + dcz;
+            if (Math.abs(cx) > WORLD_LIMIT || Math.abs(cz) > WORLD_LIMIT) continue;
+            const k = chunkKey(cx, cz);
+            if (!loadedChunks.has(k) && !buildQueue.find(q => q.k === k))
+                needed.push({ cx, cz, k, dist: dcx*dcx + dcz*dcz });
+        }
+    }
+    needed.sort((a, b) => a.dist - b.dist);
+    buildQueue.push(...needed);
+}
+
+const loadingEl = document.getElementById("loading");
+function processBuildQueue() {
+    if (!buildQueue.length) { loadingEl.textContent = ""; return; }
+    const { cx, cz, k } = buildQueue.shift();
+    if (!loadedChunks.has(k)) { generateChunk(cx, cz); loadedChunks.set(k, true); }
+    loadingEl.textContent = buildQueue.length > 0 ? `Загрузка: ${buildQueue.length} чанков` : "";
+}
+
+// ─── РЫБЫ (привязаны к озёрам) ───────────────────────────────────────────────
+const fishGroup = [];
+const FGEO  = new THREE.BoxGeometry(0.55, 0.17, 0.28);
+const TGEO  = new THREE.BoxGeometry(0.22, 0.14, 0.12);
+const FMATS = [0xff5722, 0xffc107, 0xe91e63, 0x26c6da].map(c => new THREE.MeshLambertMaterial({ color: c }));
+
+for (let li = 0; li < LAKES.length; li++) {
+    const lk = LAKES[li];
+    const count = 4 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < count; i++) {
+        const fish = new THREE.Group();
+        const mat = FMATS[(li + i) % 4];
+        fish.add(new THREE.Mesh(FGEO, mat));
+        const tail = new THREE.Mesh(TGEO, mat);
+        tail.position.set(0.34, 0, 0);
+        fish.add(tail);
+        fish.userData = {
+            angle:  (i / count) * Math.PI * 2,
+            speed:  0.008 + Math.random() * 0.013,
+            wobble: Math.random() * 100,
+            cx: lk.x + (Math.random() - 0.5) * lk.r * 0.6,
+            cz: lk.z + (Math.random() - 0.5) * lk.r * 0.6,
+            cy: WATER_LEVEL - 0.4 - Math.random() * 0.6,
+            radius: 1.0 + Math.random() * Math.min(lk.r * 0.4, 3),
+        };
+        scene.add(fish);
+        fishGroup.push(fish);
+    }
+}
+
+const PIG_FOOT_OFFSET = 0.645; // низ модели от центра группы
+
+// ─── СВИНЬИ ──────────────────────────────────────────────────────────────────
+const pigGroup = [];
+const PIG_BODY = new THREE.BoxGeometry(0.9, 0.6, 0.5);
+const PIG_HEAD = new THREE.BoxGeometry(0.45, 0.45, 0.45);
+const PIG_LEG  = new THREE.BoxGeometry(0.18, 0.35, 0.18);
+const PIG_MAT  = new THREE.MeshLambertMaterial({ color: 0xffb6c1 });
+const PIG_SNOUT_MAT = new THREE.MeshLambertMaterial({ color: 0xff8fa0 });
+const PIG_SNOUT_GEO = new THREE.BoxGeometry(0.22, 0.18, 0.12);
+
+for (let i = 0; i < 20; i++) {
+    const pig = new THREE.Group();
+
+    const body = new THREE.Mesh(PIG_BODY, PIG_MAT);
+    pig.add(body);
+
+    const head = new THREE.Mesh(PIG_HEAD, PIG_MAT);
+    head.position.set(0, 0.15, -0.55);
+    pig.add(head);
+
+    const snout = new THREE.Mesh(PIG_SNOUT_GEO, PIG_SNOUT_MAT);
+    snout.position.set(0, 0.12, -0.78);
+    pig.add(snout);
+
+    const legPositions = [[-0.3, -0.47, -0.14],[0.3, -0.47, -0.14],[-0.3, -0.47, 0.14],[0.3, -0.47, 0.14]];
+    for (const [lx, ly, lz] of legPositions) {
+        const leg = new THREE.Mesh(PIG_LEG, PIG_MAT);
+        leg.position.set(lx, ly, lz);
+        pig.add(leg);
+    }
+
+    // Случайная стартовая позиция вне озёр
+    let px, pz;
+    do {
+        px = (Math.random() - 0.5) * 100;
+        pz = (Math.random() - 0.5) * 100;
+    } while (inLake(px, pz) || inSand(px, pz));
+
+    // Ставим свинью точно на поверхность через terrainHeight
+    const surfY = Math.max(terrainHeight(px, pz), WATER_LEVEL + 1);
+    const py = (surfY + 0.5) + PIG_FOOT_OFFSET; // +1 = верх блока, +offset = низ ног
+
+    pig.userData = {
+        px, pz,
+        py,
+        velY: 0,
+        onGround: true,
+        dir: Math.random() * Math.PI * 2,
+        speed: 0.04 + Math.random() * 0.02,
+        turnTimer: Math.random() * 120,
+        wobble: Math.random() * 100,
+        legPhase: 0,
+    };
+    scene.add(pig);
+    pigGroup.push(pig);
+}
+
+// ─── ОБЛАКА ──────────────────────────────────────────────────────────────────
+const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+const CGEOS = [new THREE.BoxGeometry(5, 1.2, 2.5), new THREE.BoxGeometry(3.5, 1, 2), new THREE.BoxGeometry(2.5, 0.9, 1.8)];
+const clouds = [];
+for (let i = 0; i < 18; i++) {
+    const g = new THREE.Group();
+    for (let j = 0; j < 3 + Math.floor(Math.random() * 3); j++) {
+        const p = new THREE.Mesh(CGEOS[j % 3], cloudMat);
+        p.position.set((Math.random()-0.5)*5, (Math.random()-0.5)*0.6, (Math.random()-0.5)*2);
+        g.add(p);
+    }
+    g.position.set((Math.random()-0.5)*200, 35 + Math.random()*10, (Math.random()-0.5)*200);
+    g.userData.speed = 0.006 + Math.random() * 0.009;
+    scene.add(g);
+    clouds.push(g);
+}
+
+// ─── ПОДСВЕТКА ───────────────────────────────────────────────────────────────
+const highlight = new THREE.Mesh(
+    new THREE.BoxGeometry(1.06, 1.06, 1.06),
+    new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true })
+);
+scene.add(highlight);
+highlight.visible = false;
+let currentHit = null;
+
+// ─── РЕЙКАСТ ─────────────────────────────────────────────────────────────────
+const interpPos = new THREE.Vector3();
+const _rayOrig  = new THREE.Vector3();
+const _rayDir   = new THREE.Vector3();
+
+let _solidDirty = true;
+let _solidCache = [];
+
+function castRay(camPos, camDir, maxDist) {
+    if (_solidDirty) { _solidCache = Array.from(solidEntries); _solidDirty = false; }
+    const d2max = (maxDist + 1) * (maxDist + 1);
+    let bestT = Infinity, bestEntry = null, bestNormal = null;
+    for (const e of _solidCache) {
+        const ddx = e.x - camPos.x, ddy = e.y - camPos.y, ddz = e.z - camPos.z;
+        if (ddx*ddx + ddy*ddy + ddz*ddz > d2max) continue;
+        const ox = camPos.x, oy = camPos.y, oz = camPos.z;
+        const dx = camDir.x, dy = camDir.y, dz = camDir.z;
+        const hx = e.x - 0.5, hy = e.y - 0.5, hz = e.z - 0.5;
+        const invDx = 1/dx, invDy = 1/dy, invDz = 1/dz;
+        const tx1 = (hx      - ox) * invDx, tx2 = (hx + 1 - ox) * invDx;
+        const ty1 = (hy      - oy) * invDy, ty2 = (hy + 1 - oy) * invDy;
+        const tz1 = (hz      - oz) * invDz, tz2 = (hz + 1 - oz) * invDz;
+        const txMin = Math.min(tx1,tx2), txMax = Math.max(tx1,tx2);
+        const tyMin = Math.min(ty1,ty2), tyMax = Math.max(ty1,ty2);
+        const tzMin = Math.min(tz1,tz2), tzMax = Math.max(tz1,tz2);
+        const tEnter = Math.max(txMin, tyMin, tzMin);
+        const tExit  = Math.min(txMax, tyMax, tzMax);
+        if (tEnter > tExit || tExit < 0 || tEnter > maxDist) continue;
+        const t = tEnter < 0 ? tExit : tEnter;
+        if (t >= bestT) continue;
+        bestT = t; bestEntry = e;
+        if (tEnter === txMin)      bestNormal = new THREE.Vector3(dx < 0 ? 1 : -1, 0, 0);
+        else if (tEnter === tyMin) bestNormal = new THREE.Vector3(0, dy < 0 ? 1 : -1, 0);
+        else                       bestNormal = new THREE.Vector3(0, 0, dz < 0 ? 1 : -1);
+    }
+    return bestEntry ? { entry: bestEntry, faceNormal: bestNormal, distance: bestT } : null;
+}
+
+// ─── СГЛАЖИВАНИЕ DT ──────────────────────────────────────────────────────────
+const DT_HISTORY_SIZE = 5;
+const dtHistory = new Array(DT_HISTORY_SIZE).fill(1 / 60);
+let dtHistIdx = 0;
+function smoothDt(raw) {
+    const clamped = Math.min(raw, 0.1);
+    dtHistory[dtHistIdx] = clamped;
+    dtHistIdx = (dtHistIdx + 1) % DT_HISTORY_SIZE;
+    const sorted = dtHistory.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(DT_HISTORY_SIZE / 2)];
+    return clamped > median * 2 ? median : clamped;
+}
+
+// ─── ФИЗИКА ──────────────────────────────────────────────────────────────────
+const FIXED_DT   = 1 / 60;
+const PLAYER_H   = 1.75;
+const PLAYER_R   = 0.28;
+const GRAVITY    = 0.018;
+const JUMP_FORCE = 0.30;
+const SWIM_UP    = 0.12;
+const WATER_DRAG = 0.78;
+
+const pos     = new THREE.Vector3(0, 20, 12);
+const posPrev = new THREE.Vector3(0, 20, 12);
+
+let velY = 0, onGround = false, inWater = false, inLava = false, accumTime = 0;
+
+function feetY() { return pos.y - PLAYER_H; }
+
+function checkGround() {
+    const by = Math.floor(feetY() - 0.1);
+    const r  = PLAYER_R - 0.02;
+    return isSolid(Math.round(pos.x + r), by, Math.round(pos.z + r))
+        || isSolid(Math.round(pos.x - r), by, Math.round(pos.z + r))
+        || isSolid(Math.round(pos.x + r), by, Math.round(pos.z - r))
+        || isSolid(Math.round(pos.x - r), by, Math.round(pos.z - r));
+}
+function checkInWater() { return isWaterAt(Math.round(pos.x), Math.round(feetY() + 0.3), Math.round(pos.z)); }
+function checkInLava()  { return isLavaAt(Math.round(pos.x),  Math.round(feetY() + 0.3), Math.round(pos.z)); }
+
+function tryMoveAxis(axis, delta) {
+    if (delta === 0) return;
+    const sign = Math.sign(delta);
+    const nx = pos.x + (axis === "x" ? delta : 0);
+    const nz = pos.z + (axis === "z" ? delta : 0);
+    const fy = feetY();
+    for (const h of [0.1, 0.9, 1.6]) {
+        const by = Math.round(fy + h);
+        const perp = PLAYER_R - 0.02;
+        let blocked = false;
+        if (axis === "x") {
+            const checkX = Math.round(nx + sign * PLAYER_R);
+            blocked = isSolid(checkX, by, Math.round(nz - perp)) || isSolid(checkX, by, Math.round(nz + perp));
+        } else {
+            const checkZ = Math.round(nz + sign * PLAYER_R);
+            blocked = isSolid(Math.round(nx - perp), by, checkZ) || isSolid(Math.round(nx + perp), by, checkZ);
+        }
+        if (blocked) return;
+    }
+    if (axis === "x") pos.x = nx; else pos.z = nz;
+}
+
+function physicsTick() {
+    const spd = (inWater || inLava) ? 0.07 : 0.13;
+    const sinY = Math.sin(yaw), cosY = Math.cos(yaw);
+    let dx = 0, dz = 0;
+
+    // Клавиатура
+    if (keys["KeyW"]) { dx -= sinY * spd; dz -= cosY * spd; }
+    if (keys["KeyS"]) { dx += sinY * spd; dz += cosY * spd; }
+    if (keys["KeyA"]) { dx -= cosY * spd; dz += sinY * spd; }
+    if (keys["KeyD"]) { dx += cosY * spd; dz -= sinY * spd; }
+
+    // Джойстик (joyX = вправо, joyY > 0 = тянем вниз = идём вперёд)
+    if (joyX !== 0 || joyY !== 0) {
+        dx += ( cosY * joyX + sinY * joyY) * spd;
+        dz += (-sinY * joyX + cosY * joyY) * spd;
+    }
+
+    tryMoveAxis("x", dx);
+    tryMoveAxis("z", dz);
+
+    inWater = checkInWater();
+    inLava  = !inWater && checkInLava();
+
+    if (inWater || inLava) {
+        velY *= WATER_DRAG;
+        if (keys["Space"]) velY = SWIM_UP;
+        else velY -= GRAVITY * 0.2;
+        const headUnder = inWater
+            ? isWaterAt(Math.round(pos.x), Math.round(pos.y), Math.round(pos.z))
+            : isLavaAt(Math.round(pos.x),  Math.round(pos.y), Math.round(pos.z));
+        if (keys["Space"] && !headUnder) { velY = JUMP_FORCE; inWater = false; inLava = false; }
+        pos.y += velY;
+        const minY = DEEP_LIMIT + 0.5 + PLAYER_H;
+        if (pos.y < minY) { pos.y = minY; if (velY < 0) velY = 0; }
+    } else {
+        if (!onGround) velY -= GRAVITY;
+        pos.y += velY;
+        onGround = checkGround();
+        if (onGround && velY <= 0) {
+            const by = Math.floor(feetY() - 0.1);
+            pos.y = by + 1.0 + PLAYER_H;
+            velY = 0;
+        }
+        if (keys["Space"] && onGround) { velY = JUMP_FORCE; onGround = false; }
+    }
+
+    if (velY > 0) {
+        const hb = Math.round(pos.y + 0.1);
+        if (isSolid(Math.round(pos.x), hb, Math.round(pos.z))) { velY = 0; pos.y = hb - 0.65; }
+    }
+    // Абсолютное дно — ниже лавы не падаем
+    if (pos.y < DEEP_LIMIT + PLAYER_H) { pos.y = DEEP_LIMIT + PLAYER_H; velY = 0; }
+
+    scheduleChunks(pos.x, pos.z);
+}
+
+// ─── LOD — единый подход для всех сущностей ──────────────────────────────────
+// Три уровня по дистанции от игрока:
+//   NEAR  (0..DIST_NEAR)  — полное обновление каждый кадр + visible
+//   MID   (NEAR..DIST_MID)— обновление каждые N кадров + visible
+//   FAR   (MID..)         — visible=false, обновление заморожено
+//
+// Функция entityLOD(ex, ez) возвращает: "near" | "mid" | "far"
+// Используется одинаково для рыб, свиней, и любых будущих сущностей.
+
+const LOD_NEAR = 40;   // блоков — полное обновление
+const LOD_MID  = 80;   // блоков — редкое обновление
+const LOD_NEAR2 = LOD_NEAR * LOD_NEAR;
+const LOD_MID2  = LOD_MID  * LOD_MID;
+
+function entityLOD(ex, ez) {
+    const dx = ex - interpPos.x, dz = ez - interpPos.z;
+    const d2 = dx*dx + dz*dz;
+    if (d2 < LOD_NEAR2) return "near";
+    if (d2 < LOD_MID2)  return "mid";
+    return "far";
+}
+
+// ─── ФИЗИКА СВИНЕЙ ───────────────────────────────────────────────────────────
+// Низ модели = -0.645 от центра (ноги: y=-0.47, h=0.35 → низ = -0.645)
+// pig.position.y = (surfaceBlock + 0.5) + PIG_FOOT_OFFSET
+
+function updatePigs(simTime) {
+    for (const pig of pigGroup) {
+        const d = pig.userData;
+        const lod = entityLOD(d.px, d.pz);
+
+        // FAR — скрываем, ничего не считаем
+        if (lod === "far") { pig.visible = false; continue; }
+        pig.visible = true;
+
+        // MID — двигаем только каждые 4 кадра, анимацию замораживаем
+        const skipUpdate = lod === "mid" && (simTime * 60 | 0) % 4 !== 0;
+        if (!skipUpdate) {
+            d.turnTimer--;
+            if (d.turnTimer <= 0) {
+                d.dir += (Math.random() - 0.5) * Math.PI * 0.8;
+                d.turnTimer = 60 + Math.random() * 180;
+            }
+
+            const spd = d.speed;
+            const nx = d.px + Math.sin(d.dir) * spd;
+            const nz = d.pz + Math.cos(d.dir) * spd;
+            if (!inLake(nx, nz)) { d.px = nx; d.pz = nz; }
+            else d.dir += Math.PI * 0.5;
+
+            if (!d.onGround) d.velY -= GRAVITY;
+            d.py += d.velY;
+
+            const pigFeetY = d.py - PIG_FOOT_OFFSET;
+            const pigBy = Math.floor(pigFeetY - 0.05);
+            const pigOnGround = isSolid(Math.round(d.px), pigBy, Math.round(d.pz));
+            if (pigOnGround && d.velY <= 0) {
+                d.py = (pigBy + 0.5) + PIG_FOOT_OFFSET;
+                d.velY = 0; d.onGround = true;
+            } else {
+                d.onGround = false;
+                const expectedSurf = Math.max(terrainHeight(d.px, d.pz), WATER_LEVEL + 1);
+                const expectedPy   = (expectedSurf + 0.5) + PIG_FOOT_OFFSET;
+                if (d.py < expectedPy) { d.py = expectedPy; d.velY = 0; d.onGround = true; }
+            }
+
+            pig.position.set(d.px, d.py, d.pz);
+            pig.rotation.y = -d.dir;
+        }
+
+        // Анимация ног — только NEAR
+        if (lod === "near") {
+            d.legPhase += d.speed * 4;
+            const swing = Math.sin(d.legPhase) * 0.3;
+            pig.children[3].rotation.x =  swing;
+            pig.children[4].rotation.x = -swing;
+            pig.children[5].rotation.x = -swing;
+            pig.children[6].rotation.x =  swing;
+        }
+    }
+}
+
+// ─── ВВОД ────────────────────────────────────────────────────────────────────
+const keys = {};
+document.addEventListener("keyup", e => { keys[e.code] = false; });
+
+let yaw = 0, pitch = 0;
+// Pointer lock только по клику на canvas рендерера, не на UI-элементы
+renderer.domElement.addEventListener("click", () => renderer.domElement.requestPointerLock());
+document.addEventListener("mousemove", e => {
+    if (document.pointerLockElement !== renderer.domElement) return;
+    yaw   -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+    pitch  = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+});
+
+// Общие функции действий — используются и десктопом и мобильными кнопками.
+// Всегда пересчитывают луч сами, не полагаясь на currentHit из прошлого кадра.
+function getHit() {
+    _rayOrig.copy(interpPos);
+    _rayDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+    return castRay(_rayOrig, _rayDir, 6);
+}
+
+function doBreak() {
+    const hit = getHit();
+    if (!hit) return;
+    const broken = hit.entry;
+    if (broken.type === "rainbow") { rainbowCount++; updateRainbowUI(); }
+    removeBlock(broken);
+    currentHit = null;
+}
+
+function doPlace() {
+    const hit = getHit();
+    if (!hit) return;
+    const e2 = hit.entry, n = hit.faceNormal;
+    const bx = e2.x + n.x, by = e2.y + n.y, bz = e2.z + n.z;
+    const dx = Math.abs(bx - pos.x), dz2 = Math.abs(bz - pos.z), dy = by - feetY();
+    if (dx < 0.6 && dz2 < 0.6 && dy > -0.1 && dy < PLAYER_H + 0.2) return;
+    if (selected === "rainbow") {
+        if (rainbowCrafted <= 0) return;
+        addBlock(bx, by, bz, selected);
+        rainbowCrafted--;
+        updateRainbowUI();
+        if (rainbowCrafted === 0) {
+            document.querySelectorAll(".slot").forEach(s => s.classList.remove("active"));
+            document.querySelector(".slot[data-type='grass']").classList.add("active");
+            selected = "grass";
+        }
+    } else {
+        addBlock(bx, by, bz, selected);
+    }
+}
+
+document.addEventListener("mousedown", e => {
+    if (document.pointerLockElement !== renderer.domElement) return;
+    if (e.button === 0) doBreak();
+    if (e.button === 2) doPlace();
+});
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+// ─── 3D ИКОНКИ БЛОКОВ НА CANVAS ─────────────────────────────────────────────
+// Рисуем изометрическую проекцию куба с тремя гранями разной яркости.
+// Каждый блок имеет свои цвета граней (top / left / right).
+const ICON_DEF = {
+    grass:   { top: "#6abf5e", left: "#3d8b3d", right: "#2e6b2e", label: "🌿" },
+    stone:   { top: "#aaaaaa", left: "#707070", right: "#555555", label: "🪨" },
+    wood:    { top: "#c8874a", left: "#7a4520", right: "#5c3218", label: "🪵" },
+    leaf:    { top: "#4caf50", left: "#2e7d32", right: "#1b5e20", label: "🍃" },
+    sand:    { top: "#f0d98a", left: "#c8a84b", right: "#a07830", label: "🏖" },
+    rainbow: { top: null,      left: null,      right: null,      label: "🌈" },
+    lava:    { top: "#ff7043", left: "#bf360c", right: "#8b1a00", label: "🔥" },
+    water:   { top: "#42a5f5", left: "#1565c0", right: "#0d47a1", label: "💧" },
+};
+
+function drawBlockIcon(canvas, type) {
+    const S = 104; // рендерим в 2x для чёткости
+    canvas.width  = S;
+    canvas.height = S;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, S, S);
+
+    const def = ICON_DEF[type];
+    if (!def) return;
+
+    if (type === "rainbow") {
+        // Радужный куб — особая отрисовка с градиентными гранями
+        drawRainbowIcon(ctx, S);
+        return;
+    }
+
+    // Изометрический куб: проекция top / left-front / right-front
+    // Размер грани в проекции
+    const W = S * 0.72, H = W * 0.5; // ширина и высота top-ромба
+    const FH = S * 0.38; // высота боковых граней
+
+    const cx = S / 2;
+    const topY = S * 0.14;
+
+    // Top face (ромб)
+    ctx.beginPath();
+    ctx.moveTo(cx,       topY);
+    ctx.lineTo(cx + W/2, topY + H/2);
+    ctx.lineTo(cx,       topY + H);
+    ctx.lineTo(cx - W/2, topY + H/2);
+    ctx.closePath();
+    ctx.fillStyle = def.top;
+    ctx.fill();
+    // тонкая обводка
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 0.8; ctx.stroke();
+
+    // Left face (параллелограмм)
+    ctx.beginPath();
+    ctx.moveTo(cx - W/2, topY + H/2);
+    ctx.lineTo(cx,       topY + H);
+    ctx.lineTo(cx,       topY + H + FH);
+    ctx.lineTo(cx - W/2, topY + H/2 + FH);
+    ctx.closePath();
+    ctx.fillStyle = def.left;
+    ctx.fill();
+    ctx.stroke();
+
+    // Right face
+    ctx.beginPath();
+    ctx.moveTo(cx,       topY + H);
+    ctx.lineTo(cx + W/2, topY + H/2);
+    ctx.lineTo(cx + W/2, topY + H/2 + FH);
+    ctx.lineTo(cx,       topY + H + FH);
+    ctx.closePath();
+    ctx.fillStyle = def.right;
+    ctx.fill();
+    ctx.stroke();
+
+    // Небольшая ambient occlusion по краям
+    const grad = ctx.createLinearGradient(0, topY + H, 0, topY + H + FH);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(cx - W/2, topY + H/2);
+    ctx.lineTo(cx + W/2, topY + H/2);
+    ctx.lineTo(cx + W/2, topY + H/2 + FH);
+    ctx.lineTo(cx - W/2, topY + H/2 + FH);
+    ctx.closePath();
+    ctx.fill();
+
+    // Блик на top-грани
+    ctx.beginPath();
+    ctx.moveTo(cx,       topY + 2);
+    ctx.lineTo(cx + W/2 * 0.6, topY + H/2 * 0.6);
+    ctx.lineTo(cx,       topY + H * 0.6);
+    ctx.lineTo(cx - W/2 * 0.6, topY + H/2 * 0.6);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fill();
+}
+
+function drawRainbowIcon(ctx, S) {
+    const COLORS = ["#ff4444","#ff9900","#ffee00","#44cc44","#2299ff","#9933ff","#ff44bb"];
+    const W = S * 0.72, H = W * 0.5, FH = S * 0.38;
+    const cx = S / 2, topY = S * 0.14;
+
+    // Top — горизонтальные полосы в ромбе
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, topY); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx, topY+H); ctx.lineTo(cx-W/2, topY+H/2);
+    ctx.closePath(); ctx.clip();
+    const strH = H / COLORS.length;
+    for (let i = 0; i < COLORS.length; i++) {
+        ctx.fillStyle = COLORS[i];
+        ctx.fillRect(cx - W/2, topY + i * strH, W, strH + 1);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx, topY); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx, topY+H); ctx.lineTo(cx-W/2, topY+H/2);
+    ctx.closePath(); ctx.stroke();
+
+    // Left face — вертикальные полосы
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx-W/2, topY+H/2); ctx.lineTo(cx, topY+H);
+    ctx.lineTo(cx, topY+H+FH); ctx.lineTo(cx-W/2, topY+H/2+FH);
+    ctx.closePath(); ctx.clip();
+    const lw = W / COLORS.length;
+    for (let i = 0; i < COLORS.length; i++) {
+        const darkened = shadeColor(COLORS[i], -40);
+        ctx.fillStyle = darkened;
+        // Вертикальные полосы скошены под углом грани
+        ctx.fillRect(cx - W/2 + i * lw, topY, lw + 1, S);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx-W/2, topY+H/2); ctx.lineTo(cx, topY+H);
+    ctx.lineTo(cx, topY+H+FH); ctx.lineTo(cx-W/2, topY+H/2+FH);
+    ctx.closePath(); ctx.stroke();
+
+    // Right face
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, topY+H); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx+W/2, topY+H/2+FH); ctx.lineTo(cx, topY+H+FH);
+    ctx.closePath(); ctx.clip();
+    for (let i = 0; i < COLORS.length; i++) {
+        const darkened = shadeColor(COLORS[i], -65);
+        ctx.fillStyle = darkened;
+        ctx.fillRect(cx + i * lw, topY, lw + 1, S);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx, topY+H); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx+W/2, topY+H/2+FH); ctx.lineTo(cx, topY+H+FH);
+    ctx.closePath(); ctx.stroke();
+
+    // Блик
+    ctx.beginPath();
+    ctx.moveTo(cx, topY+2); ctx.lineTo(cx+W/2*0.5, topY+H/2*0.5);
+    ctx.lineTo(cx, topY+H*0.5); ctx.lineTo(cx-W/2*0.5, topY+H/2*0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fill();
+}
+
+function shadeColor(hex, amt) {
+    let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    r = Math.max(0, Math.min(255, r + amt));
+    g = Math.max(0, Math.min(255, g + amt));
+    b = Math.max(0, Math.min(255, b + amt));
+    return `rgb(${r},${g},${b})`;
+}
+
+// Отрисовываем все иконки при старте
+["grass","stone","wood","leaf","sand","rainbow"].forEach(type => {
+    const c = document.getElementById("icon-" + type);
+    if (c) drawBlockIcon(c, type);
+});
+
+// ─── СЧЁТЧИК РАДУЖНЫХ БЛОКОВ ─────────────────────────────────────────────────
+// При добывании радужного блока (ЛКМ) — он идёт в инвентарь, не в мир.
+// При ПКМ с выбранным "rainbow" — тратим один из накопленных.
+// Кнопка "Скрафтить" появляется когда накоплено ≥ 5.
+const RAINBOW_CRAFT_COST = 5; // unused, kept for reference
+let rainbowCount   = 0;  // сколько собрано = сколько можно поставить
+let rainbowCrafted = 0;  // alias = rainbowCount, для совместимости с остальным кодом
+
+const rainbowBadge = document.getElementById("rainbow-badge");
+const craftBtn     = document.getElementById("craft-btn");
+if (craftBtn) craftBtn.style.display = "none"; // крафтинг убран
+
+function updateRainbowUI() {
+    rainbowCrafted = rainbowCount; // одно и то же
+    rainbowBadge.textContent = rainbowCount;
+    rainbowBadge.style.color = rainbowCount > 0 ? "#ffe033" : "#888";
+}
+
+updateRainbowUI();
+
+// ─── ВЫБОР СЛОТА ─────────────────────────────────────────────────────────────
+const SLOT_TYPES = ["grass","stone","wood","leaf","sand","rainbow"];
+
+function selectSlot(idx) {
+    const type = SLOT_TYPES[idx];
+    if (!type) return;
+    // Rainbow можно выбрать только если есть скрафченные
+    if (type === "rainbow" && rainbowCrafted === 0) return;
+    document.querySelectorAll(".slot").forEach(s => s.classList.remove("active"));
+    const slot = document.querySelector(`.slot[data-type="${type}"]`);
+    if (slot) slot.classList.add("active");
+    selected = type;
+}
+
+// Клик мышью по слоту — работает всегда (pointer lock не мешает)
+document.querySelectorAll(".slot").forEach((slot, idx) => {
+    slot.addEventListener("mousedown", e => {
+        e.stopPropagation(); // не даём canvas перехватить
+        selectSlot(idx);
+    });
+});
+
+// Цифры 1–6 и Tab
+document.addEventListener("keydown", e => {
+    keys[e.code] = true;
+    if (e.code === "Space") e.preventDefault();
+    // Цифры
+    if (e.code.startsWith("Digit")) {
+        const n = parseInt(e.code.replace("Digit","")) - 1;
+        if (n >= 0 && n < SLOT_TYPES.length) selectSlot(n);
+    }
+    // Tab — следующий слот
+    if (e.code === "Tab") {
+        e.preventDefault();
+        const cur = SLOT_TYPES.indexOf(selected);
+        selectSlot((cur + 1) % SLOT_TYPES.length);
+    }
+});
+
+// ─── МОБИЛЬНЫЕ КОНТРОЛЫ ──────────────────────────────────────────────────────
+// Джойстик управляет движением через виртуальные оси joyX/joyY [-1..1].
+// Область свайпа справа управляет камерой (yaw/pitch).
+// Кнопка прыжка — keys["Space"].
+
+let joyX = 0, joyY = 0; // виртуальные оси джойстика
+
+const joystickZone = document.getElementById("joystick-zone");
+const joystickKnob = document.getElementById("joystick-knob");
+const btnJump      = document.getElementById("btn-jump");
+const lookZone     = document.getElementById("look-zone");
+
+if (joystickZone) {
+    const JOY_R = 65; // радиус зоны в px
+    const KNOB_R = 26;
+    let joyActive = false, joyId = -1;
+    let joyOriginX = 0, joyOriginY = 0;
+
+    joystickZone.addEventListener("touchstart", e => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        joyActive = true; joyId = t.identifier;
+        const rect = joystickZone.getBoundingClientRect();
+        joyOriginX = rect.left + rect.width  / 2;
+        joyOriginY = rect.top  + rect.height / 2;
+    }, { passive: false });
+
+    function joyMove(e) {
+        if (!joyActive) return;
+        e.preventDefault();
+        let t = null;
+        for (const touch of e.changedTouches) if (touch.identifier === joyId) { t = touch; break; }
+        if (!t) return;
+        let dx = t.clientX - joyOriginX;
+        let dy = t.clientY - joyOriginY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > JOY_R) { dx = dx/dist*JOY_R; dy = dy/dist*JOY_R; }
+        joyX = dx / JOY_R;
+        joyY = dy / JOY_R;
+        joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    }
+    function joyEnd(e) {
+        for (const touch of e.changedTouches) {
+            if (touch.identifier === joyId) {
+                joyActive = false; joyId = -1;
+                joyX = 0; joyY = 0;
+                joystickKnob.style.transform = "translate(-50%, -50%)";
+            }
+        }
+    }
+    document.addEventListener("touchmove",   joyMove, { passive: false });
+    document.addEventListener("touchend",    joyEnd);
+    document.addEventListener("touchcancel", joyEnd);
+}
+
+// Кнопка прыжка
+if (btnJump) {
+    btnJump.addEventListener("touchstart", e => { e.preventDefault(); keys["Space"] = true;  }, { passive: false });
+    btnJump.addEventListener("touchend",   e => { e.preventDefault(); keys["Space"] = false; }, { passive: false });
+}
+
+// Кнопка сломать блок
+const btnBreak = document.getElementById("btn-break");
+if (btnBreak) {
+    btnBreak.addEventListener("touchstart", e => { e.preventDefault(); doBreak(); }, { passive: false });
+}
+
+// Кнопка поставить блок
+const btnPlace = document.getElementById("btn-place");
+if (btnPlace) {
+    btnPlace.addEventListener("touchstart", e => { e.preventDefault(); doPlace(); }, { passive: false });
+}
+
+// Зона свайпа для камеры (правая половина экрана)
+if (lookZone) {
+    let lookId = -1, lookLastX = 0, lookLastY = 0;
+    const LOOK_SENS = 0.005;
+    const BTN_IDS = new Set(["btn-jump","btn-break","btn-place"]);
+
+    lookZone.addEventListener("touchstart", e => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        // Не захватываем тач если он начался на кнопке
+        const target = document.elementFromPoint(t.clientX, t.clientY);
+        if (target && BTN_IDS.has(target.id)) return;
+        lookId = t.identifier; lookLastX = t.clientX; lookLastY = t.clientY;
+    }, { passive: false });
+
+    lookZone.addEventListener("touchmove", e => {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+            if (t.identifier !== lookId) continue;
+            yaw   -= (t.clientX - lookLastX) * LOOK_SENS;
+            pitch -= (t.clientY - lookLastY) * LOOK_SENS;
+            pitch  = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+            lookLastX = t.clientX; lookLastY = t.clientY;
+        }
+    }, { passive: false });
+
+    lookZone.addEventListener("touchend",   e => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = -1; });
+    lookZone.addEventListener("touchcancel",e => { lookId = -1; });
+}
+
+// Инжектируем джойстик в physicsTick через патч движения
+const _origPhysicsTick = physicsTick;
+// Вместо полного переписывания — добавляем виртуальные клавиши от джойстика
+// перед каждым тиком через глобальные joyX/joyY
+
+const fpsEl = document.getElementById("fps");
+const hudEl = document.getElementById("hud");
+let fpsFrames = 0, fpsAccum = 0;
+
+// ─── ГЛАВНЫЙ ЦИКЛ ────────────────────────────────────────────────────────────
+let lastRafTime = -1, simTime = 0;
+const underwaterDiv  = document.getElementById("underwater");
+const lavaOverlayDiv = document.getElementById("lava-overlay");
+
+function animate(now) {
+    requestAnimationFrame(animate);
+    if (lastRafTime < 0) { lastRafTime = now; return; }
+
+    const rawDt = (now - lastRafTime) / 1000;
+    lastRafTime = now;
+    const dt = smoothDt(rawDt);
+
+    fpsFrames++; fpsAccum += rawDt;
+    if (fpsAccum >= 0.5) {
+        const fps = Math.round(fpsFrames / fpsAccum);
+        fpsEl.textContent = fps + " FPS";
+        fpsEl.style.color = fps >= 50 ? "#0f0" : fps >= 30 ? "#ff0" : "#f44";
+        fpsFrames = 0; fpsAccum = 0;
+    }
+
+    accumTime += dt;
+    posPrev.copy(pos);  // сохраняем позицию ДО всех тиков кадра
+    while (accumTime >= FIXED_DT) {
+        physicsTick();
+        accumTime -= FIXED_DT;
+        simTime += FIXED_DT;
+    }
+
+    const alpha = Math.min(accumTime / FIXED_DT, 1);
+    interpPos.lerpVectors(posPrev, pos, alpha);
+    camera.position.copy(interpPos);
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+
+    // Координаты в HUD
+    hudEl.textContent = `X: ${Math.round(pos.x)} \u00a0 Y: ${Math.round(feetY())} \u00a0 Z: ${Math.round(pos.z)}`;
+
+    // Оверлеи
+    const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
+    const headInLava  = isLavaAt (Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
+    underwaterDiv.style.display  = headInWater ? "block" : "none";
+    lavaOverlayDiv.style.display = headInLava  ? "block" : "none";
+
+    // Рыбы — LOD по дистанции
+    for (const fish of fishGroup) {
+        const d = fish.userData;
+        const lod = entityLOD(d.cx, d.cz);
+        if (lod === "far") { fish.visible = false; continue; }
+        fish.visible = true;
+        // MID — обновляем каждые 3 кадра
+        if (lod === "mid" && (simTime * 60 | 0) % 3 !== 0) continue;
+        d.angle += d.speed;
+        fish.position.x = d.cx + Math.cos(d.angle) * d.radius;
+        fish.position.z = d.cz + Math.sin(d.angle) * d.radius;
+        fish.position.y = d.cy + Math.sin(simTime * 2 + d.wobble) * 0.1;
+        fish.rotation.y = -d.angle + Math.PI / 2;
+        // Виляние хвостом — только NEAR
+        if (lod === "near") fish.children[1].rotation.y = Math.sin(simTime * 9 + d.wobble) * 0.4;
+    }
+
+    // Свиньи
+    updatePigs(simTime);
+
+    // Облака — обновляем всегда (движутся медленно), но скрываем очень далёкие
+    for (const c of clouds) {
+        c.position.x += c.userData.speed;
+        if (c.position.x > 120) c.position.x = -120;
+        // Облака высоко — LOD только по X/Z
+        const cdx = c.position.x - interpPos.x, cdz = c.position.z - interpPos.z;
+        c.visible = (cdx*cdx + cdz*cdz) < 150*150;
+    }
+
+    processBuildQueue();
+
+    // Подсветка от "факела" игрока — блоки рядом всегда видны
+    updateTorchLight(interpPos.x, interpPos.y, interpPos.z);
+
+    _rayOrig.copy(interpPos);
+    _rayDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+    const hit = castRay(_rayOrig, _rayDir, 6);
+    if (hit) { highlight.visible = true; highlight.position.set(hit.entry.x, hit.entry.y, hit.entry.z); currentHit = hit; }
+    else      { highlight.visible = false; currentHit = null; }
+
+    renderer.render(scene, camera);
+}
+
+scheduleChunks(0, 0);
+requestAnimationFrame(animate);
+
+window.addEventListener("resize", () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
