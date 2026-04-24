@@ -113,7 +113,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 
 /* Кнопки действий — сломать и поставить */
 #btn-break {
-    position: fixed; right: 110px; bottom: 110px;
+    position: fixed; right: 110px; bottom: 195px;
     width: 62px; height: 62px; border-radius: 50%;
     background: rgba(220,80,60,0.35);
     border: 2px solid rgba(255,120,100,0.7);
@@ -141,7 +141,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 }
 
 /* Все кнопки поверх look-zone */
-#btn-jump, #btn-break, #btn-place, #joystick-zone {
+#btn-jump, #btn-break, #btn-place, #joystick-zone, #inventory {
     z-index: 20;
 }
 </style>
@@ -153,6 +153,13 @@ body { margin: 0; overflow: hidden; background: #000; }
 <div id="lava-overlay"></div>
 <div id="hud">X: 0 &nbsp; Y: 0 &nbsp; Z: 0</div>
 <div id="fps">-- FPS</div>
+<div id="profiler" style="
+    position:fixed; top:10px; right:90px;
+    color:#0ff; font-family:monospace; font-size:11px;
+    text-shadow:1px 1px 2px #000; pointer-events:none;
+    line-height:1.6; background:rgba(0,0,0,0.45);
+    padding:5px 8px; border-radius:6px; display:none;
+"></div>
 <div id="loading"></div>
 <div id="inventory">
     <div class="slot active" data-type="grass"><canvas id="icon-grass"></canvas></div>
@@ -161,6 +168,8 @@ body { margin: 0; overflow: hidden; background: #000; }
     <div class="slot" data-type="leaf"><canvas id="icon-leaf"></canvas></div>
     <div class="slot" data-type="sand"><canvas id="icon-sand"></canvas></div>
     <div class="slot" data-type="rainbow"><canvas id="icon-rainbow"></canvas><span class="badge" id="rainbow-badge">0</span></div>
+    <div class="slot" data-type="aquarium"><canvas id="icon-aquarium"></canvas></div>
+    <div class="slot" data-type="glass"><canvas id="icon-glass"></canvas></div>
 </div>
 
 <div id="mobile-controls">
@@ -201,7 +210,19 @@ scene.add(sun);
 
 // ─── INSTANCED MESH ──────────────────────────────────────────────────────────
 const BGEO = new THREE.BoxGeometry(1, 1, 1);
-const MAX_INST = 80000;
+const MAX_INST = 200000; // дефолт
+const MAX_INST_BY_TYPE = {
+    stone: 20000, // самый распространённый — подземные слои
+    grass: 60000,
+    sand:  30000,
+    water: 30000,
+    lava:  20000,
+    wood:  15000,
+    leaf:  20000,
+    rainbow: 10000,
+    aquarium: 5000,
+    glass: 5000,
+};
 
 // Радуга: одна текстура с 7 горизонтальными полосами на кубе
 const RAINBOW_COLORS = [0xff0000, 0xff7700, 0xffff00, 0x00cc00, 0x0000ff, 0x8800cc, 0xee00aa];
@@ -222,10 +243,10 @@ function makeRainbowTexture() {
     return tex;
 }
 
-const BLOCK_TYPES  = ["grass","stone","wood","leaf","sand","water","lava","rainbow"];
+const BLOCK_TYPES  = ["grass","stone","wood","leaf","sand","water","lava","rainbow","aquarium","glass"];
 const BLOCK_COLOR  = {
     grass:0x4caf50, stone:0x888888, wood:0x8b5a2b, leaf:0x2e7d32, sand:0xe2c97e,
-    water:0x1565c0, lava:0xff4500, rainbow:0xffffff,
+    water:0x1565c0, lava:0xff4500, rainbow:0xffffff, aquarium:0x88ddff, glass:0xddf4ff,
 };
 
 const iMesh = {};
@@ -233,26 +254,30 @@ for (const t of BLOCK_TYPES) {
     const isWater   = t === "water";
     const isLava    = t === "lava";
     const isRainbow = t === "rainbow";
+    const isAquarium = t === "aquarium";
+    const isGlass   = t === "glass";
     const mat = new THREE.MeshLambertMaterial({
         color: BLOCK_COLOR[t],
         map: isRainbow ? makeRainbowTexture() : null,
-        transparent: isWater,
-        opacity: isWater ? 0.62 : 1,
-        depthWrite: !isWater,
-        polygonOffset: isWater,
-        polygonOffsetFactor: isWater ? -1 : 0,
-        polygonOffsetUnits:  isWater ? -1 : 0,
+        transparent: isWater || isAquarium || isGlass,
+        opacity: isWater ? 0.62 : isAquarium ? 0.35 : isGlass ? 0.28 : 1,
+        depthWrite: !isWater && !isAquarium && !isGlass,
+        polygonOffset: isWater || isAquarium || isGlass,
+        polygonOffsetFactor: (isWater || isAquarium || isGlass) ? -1 : 0,
+        polygonOffsetUnits:  (isWater || isAquarium || isGlass) ? -1 : 0,
         ...(isLava ? { emissive: new THREE.Color(0xff4500), emissiveIntensity: 0.6 } : {}),
         ...(isRainbow ? { emissive: new THREE.Color(0x888888), emissiveIntensity: 0.3 } : {}),
-        // instanceColor будет перемножаться с основным цветом
+        ...(isAquarium ? { emissive: new THREE.Color(0x0088cc), emissiveIntensity: 0.25 } : {}),
+        ...(isGlass ? { emissive: new THREE.Color(0xaaddff), emissiveIntensity: 0.12 } : {}),
         vertexColors: false,
     });
-    const im = new THREE.InstancedMesh(BGEO, mat, MAX_INST);
-    im.castShadow    = !isWater && !isRainbow;
-    im.receiveShadow = !isWater;
+    const maxInst = MAX_INST_BY_TYPE[t] || MAX_INST;
+    const im = new THREE.InstancedMesh(BGEO, mat, maxInst);
+    im.castShadow    = !isWater && !isRainbow && !isAquarium && !isGlass;
+    im.receiveShadow = !isWater && !isAquarium && !isGlass;
     im.count = 0;
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_INST * 3).fill(1), 3);
+    im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(maxInst * 3).fill(1), 3);
     im.instanceColor.setUsage(THREE.DynamicDrawUsage);
     im.frustumCulled = false;
     scene.add(im);
@@ -279,22 +304,39 @@ const SKY_CHECK_H = 40;
 const TORCH_R      = 5;     // радиус подсветки
 const TORCH_POWER  = 0.55;  // максимальная добавка от "факела"
 
-const skylightCache = new Map();
+// skyColumn[`x,z`] = наибольший Y твёрдого блока в этой колонке.
+// hasSkyAbove(x,y,z) == (y >= skyColumn) — O(1) вместо O(40).
+const skyColumn = new Map();
+function ckey(x, z) { return `${Math.round(x)},${Math.round(z)}`; }
+
+function skyColumnAdd(x, y, z) {
+    const k = ckey(x, z);
+    const cur = skyColumn.get(k);
+    if (cur === undefined || y > cur) skyColumn.set(k, y);
+}
+
+function skyColumnRemove(x, y, z) {
+    const k = ckey(x, z);
+    // Если удаляемый блок был вершиной колонки — ищем новый максимум вниз
+    const cur = skyColumn.get(k);
+    if (cur !== y) return; // не вершина — ничего не меняется
+    let newTop = undefined;
+    for (let cy = y - 1; cy >= y - SKY_CHECK_H * 2; cy--) {
+        if (blockMap.has(bkey(x, cy, z))) { newTop = cy; break; }
+    }
+    if (newTop === undefined) skyColumn.delete(k);
+    else skyColumn.set(k, newTop);
+}
 
 function depthBrightness(y) {
     const t = Math.max(0, Math.min(1, (y - DEEP_Y) / (SURFACE_Y - DEEP_Y)));
-    // Нелинейная кривая: у поверхности светло, глубоко — не совсем темно
     return MIN_BRIGHT + Math.pow(t, 0.7) * (1 - MIN_BRIGHT);
 }
 
 function hasSkyAbove(x, y, z) {
-    const k = bkey(x, y, z);
-    if (skylightCache.has(k)) return skylightCache.get(k);
-    for (let cy = y + 1; cy <= y + SKY_CHECK_H; cy++) {
-        if (blockMap.has(bkey(x, cy, z))) { skylightCache.set(k, false); return false; }
-    }
-    skylightCache.set(k, true);
-    return true;
+    const top = skyColumn.get(ckey(x, z));
+    // нет ни одного блока в колонке, или самый верхний блок ниже y → небо открыто
+    return top === undefined || top <= y;
 }
 
 function blockBrightness(x, y, z) {
@@ -309,52 +351,62 @@ function blockBrightness(x, y, z) {
 let torchFrame = 0;
 function updateTorchLight(px, py, pz) {
     torchFrame++;
-    if (torchFrame % 3 !== 0) return; // не каждый кадр для производительности
+    if (torchFrame % 3 !== 0) return;
     const r = TORCH_R;
-    for (const [k, entry] of blockMap) {
-        const dx = entry.x - px, dy = entry.y - py, dz = entry.z - pz;
-        const dist2 = dx*dx + dy*dy + dz*dz;
-        if (dist2 > r*r) continue;
-        const dist = Math.sqrt(dist2);
-        // Факел: квадратичное затухание
-        const torchAdd = TORCH_POWER * Math.max(0, 1 - dist / r) ** 2;
-        const base = blockBrightness(entry.x, entry.y, entry.z);
-        const br = Math.min(1.0, base + torchAdd);
-        _brightColor.setRGB(br, br, br);
-        iMesh[entry.type].setColorAt(entry.idx, _brightColor);
-        iMesh[entry.type].instanceColor.needsUpdate = true;
+    const ipx = Math.round(px), ipy = Math.round(py), ipz = Math.round(pz);
+    const dirty = new Set();
+    for (let x = ipx - r; x <= ipx + r; x++) {
+        for (let y = ipy - r; y <= ipy + r; y++) {
+            for (let z = ipz - r; z <= ipz + r; z++) {
+                const entry = blockMap.get(bkey(x, y, z));
+                if (!entry) continue;
+                const dx = x - px, dy = y - py, dz = z - pz;
+                const dist2 = dx*dx + dy*dy + dz*dz;
+                if (dist2 > r*r) continue;
+                const dist = Math.sqrt(dist2);
+                const torchAdd = TORCH_POWER * Math.max(0, 1 - dist / r) ** 2;
+                const base = blockBrightness(x, y, z);
+                const br = Math.min(1.0, base + torchAdd);
+                _brightColor.setRGB(br, br, br);
+                iMesh[entry.type].setColorAt(entry.idx, _brightColor);
+                dirty.add(entry.type);
+            }
+        }
     }
+    for (const t of dirty) iMesh[t].instanceColor.needsUpdate = true;
 }
 
-// Применить яркость к инстансу
+// Применить яркость к инстансу (без GPU flush — вызывай flushColors после батча)
 const _brightColor = new THREE.Color();
 function applyBrightness(type, idx, x, y, z) {
     const br = blockBrightness(x, y, z);
     _brightColor.setRGB(br, br, br);
     iMesh[type].setColorAt(idx, _brightColor);
-    iMesh[type].instanceColor.needsUpdate = true;
+}
+
+// Сбросить флаги GPU для всех мешей у которых менялись цвета
+const _colorDirtyTypes = new Set();
+function markColorDirty(type) { _colorDirtyTypes.add(type); }
+function flushColors() {
+    for (const t of _colorDirtyTypes) iMesh[t].instanceColor.needsUpdate = true;
+    _colorDirtyTypes.clear();
 }
 
 // Пересчитать skylight и цвета блоков в радиусе вокруг точки
 // (вызывается при ломании/постановке блока)
 function refreshLightAround(cx, cy, cz, radius) {
-    // Сбрасываем кэш skylight в затронутой колонке и соседних
-    for (const [k, entry] of blockMap) {
-        const dx = Math.abs(entry.x - cx);
-        const dz = Math.abs(entry.z - cz);
-        if (dx <= radius && dz <= radius) {
-            skylightCache.delete(bkey(entry.x, entry.y, entry.z));
+    const ix = Math.round(cx), iy = Math.round(cy), iz = Math.round(cz);
+    for (let x = ix - radius; x <= ix + radius; x++) {
+        for (let y = iy - radius; y <= iy + radius + SKY_CHECK_H; y++) {
+            for (let z = iz - radius; z <= iz + radius; z++) {
+                const entry = blockMap.get(bkey(x, y, z));
+                if (!entry) continue;
+                applyBrightness(entry.type, entry.idx, x, y, z);
+                markColorDirty(entry.type);
+            }
         }
     }
-    // Перекрашиваем затронутые блоки
-    for (const [k, entry] of blockMap) {
-        const dx = Math.abs(entry.x - cx);
-        const dy = Math.abs(entry.y - cy);
-        const dz = Math.abs(entry.z - cz);
-        if (dx <= radius && dy <= radius + SKY_CHECK_H && dz <= radius) {
-            applyBrightness(entry.type, entry.idx, entry.x, entry.y, entry.z);
-        }
-    }
+    flushColors();
 }
 
 const _dummy = new THREE.Object3D();
@@ -365,7 +417,7 @@ const waterSet = new Set();
 const lavaSet  = new Set();
 const freeList = {};
 for (const t of BLOCK_TYPES) freeList[t] = [];
-const solidEntries = new Set();
+// solidEntries removed — DDA не нуждается в списке солидных блоков
 
 let selected = "grass";
 
@@ -374,12 +426,18 @@ function bkey(x, y, z) { return `${Math.round(x)},${Math.round(y)},${Math.round(
 function addBlock(x, y, z, type) {
     type = type || "grass";
     const k = bkey(x, y, z);
-    if (blockMap.has(k)) return;
+    if (blockMap.has(k)) { addBlock._lastFail = `occupied`; return; }
     const im = iMesh[type];
-    if (!im) return;
+    if (!im) { addBlock._lastFail = `no_mesh`; return; }
+    const limit = MAX_INST_BY_TYPE[type] || MAX_INST;
     let idx;
-    if (freeList[type].length > 0) idx = freeList[type].pop();
-    else { if (im.count >= MAX_INST) return; idx = im.count++; }
+    if (freeList[type].length > 0) {
+        idx = freeList[type].pop();
+    } else {
+        if (im.count >= limit) { addBlock._lastFail = `limit_${im.count}/${limit}`; return; }
+        idx = im.count++;
+    }
+    addBlock._lastFail = null;
     const rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
     _dummy.position.set(rx, ry, rz);
     _dummy.scale.set(1, 1, 1);
@@ -390,12 +448,13 @@ function addBlock(x, y, z, type) {
     blockMap.set(k, entry);
     if (type === "water") waterSet.add(k);
     else if (type === "lava") lavaSet.add(k);
-    else { solidEntries.add(entry); _solidDirty = true; }
+    // (solidEntries removed)
 
     // Яркость по глубине + skylight
     applyBrightness(type, idx, rx, ry, rz);
-    // Новый блок закрывает небо снизу — инвалидируем колонку
-    skylightCache.delete(k);
+    markColorDirty(type);
+    // Новый блок может стать вершиной своей колонки
+    skyColumnAdd(rx, ry, rz);
 }
 
 function removeBlock(entry) {
@@ -408,12 +467,9 @@ function removeBlock(entry) {
     blockMap.delete(k);
     waterSet.delete(k);
     lavaSet.delete(k);
-    solidEntries.delete(data);
-    _solidDirty = true;
 
-    // Пробитое отверстие открывает небо снизу — обновляем свет в колонке
-    skylightCache.delete(k);
-    // Пересчитываем блоки под удалённым (они теперь могут получить skylight)
+    // Пробитое отверстие открывает небо снизу — обновляем колонку и свет
+    skyColumnRemove(data.x, data.y, data.z);
     refreshLightAround(data.x, data.y, data.z, 1);
 }
 
@@ -538,7 +594,6 @@ function generateChunk(cx, cz) {
             }
         }
     }
-    _solidDirty = true;
 }
 
 // undergroundType теперь учитывает абсолютную глубину:
@@ -560,11 +615,9 @@ function unloadChunk(cx, cz) {
                 blockMap.delete(k);
                 waterSet.delete(k);
                 lavaSet.delete(k);
-                solidEntries.delete(entry);
             }
         }
     }
-    _solidDirty = true;
 }
 
 function scheduleChunks(px, pz) {
@@ -594,7 +647,7 @@ const loadingEl = document.getElementById("loading");
 function processBuildQueue() {
     if (!buildQueue.length) { loadingEl.textContent = ""; return; }
     const { cx, cz, k } = buildQueue.shift();
-    if (!loadedChunks.has(k)) { generateChunk(cx, cz); loadedChunks.set(k, true); }
+    if (!loadedChunks.has(k)) { generateChunk(cx, cz); loadedChunks.set(k, true); flushColors(); }
     loadingEl.textContent = buildQueue.length > 0 ? `Загрузка: ${buildQueue.length} чанков` : "";
 }
 
@@ -625,6 +678,65 @@ for (let li = 0; li < LAKES.length; li++) {
         };
         scene.add(fish);
         fishGroup.push(fish);
+    }
+}
+
+// ─── РЫБКИ В АКВАРИУМАХ ──────────────────────────────────────────────────────
+// Каждый поставленный аквариум получает 2-3 маленьких рыбки внутри.
+const aquariumFishMap = new Map(); // bkey → [fish, fish, ...]
+const AFGEO = new THREE.BoxGeometry(0.22, 0.07, 0.12);
+const ATGEO = new THREE.BoxGeometry(0.09, 0.06, 0.05);
+const AFMATS = [0xff5722, 0xffc107, 0xe91e63, 0x26c6da, 0x8bc34a, 0xff9800].map(
+    c => new THREE.MeshLambertMaterial({ color: c })
+);
+
+function spawnAquariumFish(bx, by, bz) {
+    const key = bkey(bx, by, bz);
+    if (aquariumFishMap.has(key)) return;
+    const fishes = [];
+    const count = 2 + Math.floor(Math.random() * 2); // 2-3 рыбки
+    for (let i = 0; i < count; i++) {
+        const f = new THREE.Group();
+        const mat = AFMATS[Math.floor(Math.random() * AFMATS.length)];
+        f.add(new THREE.Mesh(AFGEO, mat));
+        const tail = new THREE.Mesh(ATGEO, mat);
+        tail.position.set(0.14, 0, 0);
+        f.add(tail);
+        f.userData = {
+            cx: bx + (Math.random() - 0.5) * 0.3,
+            cy: by + (Math.random() - 0.5) * 0.15,
+            cz: bz + (Math.random() - 0.5) * 0.3,
+            angle:  (i / count) * Math.PI * 2,
+            speed:  0.025 + Math.random() * 0.02,
+            wobble: Math.random() * 100,
+            radius: 0.18 + Math.random() * 0.12,
+            bx, by, bz,
+        };
+        scene.add(f);
+        fishes.push(f);
+    }
+    aquariumFishMap.set(key, fishes);
+}
+
+function removeAquariumFish(bx, by, bz) {
+    const key = bkey(bx, by, bz);
+    const fishes = aquariumFishMap.get(key);
+    if (!fishes) return;
+    for (const f of fishes) scene.remove(f);
+    aquariumFishMap.delete(key);
+}
+
+function updateAquariumFish(simTime) {
+    for (const [, fishes] of aquariumFishMap) {
+        for (const fish of fishes) {
+            const d = fish.userData;
+            d.angle += d.speed;
+            fish.position.x = d.cx + Math.cos(d.angle) * d.radius;
+            fish.position.z = d.cz + Math.sin(d.angle) * d.radius;
+            fish.position.y = d.cy + Math.sin(simTime * 3 + d.wobble) * 0.06;
+            fish.rotation.y = -d.angle + Math.PI / 2;
+            fish.children[1].rotation.y = Math.sin(simTime * 12 + d.wobble) * 0.35;
+        }
     }
 }
 
@@ -717,37 +829,65 @@ const interpPos = new THREE.Vector3();
 const _rayOrig  = new THREE.Vector3();
 const _rayDir   = new THREE.Vector3();
 
-let _solidDirty = true;
-let _solidCache = [];
 
+// ─── РЕЙКАСТ — DDA (voxel traversal) ────────────────────────────────────────
+// Идём по сетке клетка-за-клеткой вдоль луча.
+// Сложность O(maxDist) вместо O(всех блоков).
+// Нормаль определяется по тому, какая ось дала последний шаг.
 function castRay(camPos, camDir, maxDist) {
-    if (_solidDirty) { _solidCache = Array.from(solidEntries); _solidDirty = false; }
-    const d2max = (maxDist + 1) * (maxDist + 1);
-    let bestT = Infinity, bestEntry = null, bestNormal = null;
-    for (const e of _solidCache) {
-        const ddx = e.x - camPos.x, ddy = e.y - camPos.y, ddz = e.z - camPos.z;
-        if (ddx*ddx + ddy*ddy + ddz*ddz > d2max) continue;
-        const ox = camPos.x, oy = camPos.y, oz = camPos.z;
-        const dx = camDir.x, dy = camDir.y, dz = camDir.z;
-        const hx = e.x - 0.5, hy = e.y - 0.5, hz = e.z - 0.5;
-        const invDx = 1/dx, invDy = 1/dy, invDz = 1/dz;
-        const tx1 = (hx      - ox) * invDx, tx2 = (hx + 1 - ox) * invDx;
-        const ty1 = (hy      - oy) * invDy, ty2 = (hy + 1 - oy) * invDy;
-        const tz1 = (hz      - oz) * invDz, tz2 = (hz + 1 - oz) * invDz;
-        const txMin = Math.min(tx1,tx2), txMax = Math.max(tx1,tx2);
-        const tyMin = Math.min(ty1,ty2), tyMax = Math.max(ty1,ty2);
-        const tzMin = Math.min(tz1,tz2), tzMax = Math.max(tz1,tz2);
-        const tEnter = Math.max(txMin, tyMin, tzMin);
-        const tExit  = Math.min(txMax, tyMax, tzMax);
-        if (tEnter > tExit || tExit < 0 || tEnter > maxDist) continue;
-        const t = tEnter < 0 ? tExit : tEnter;
-        if (t >= bestT) continue;
-        bestT = t; bestEntry = e;
-        if (tEnter === txMin)      bestNormal = new THREE.Vector3(dx < 0 ? 1 : -1, 0, 0);
-        else if (tEnter === tyMin) bestNormal = new THREE.Vector3(0, dy < 0 ? 1 : -1, 0);
-        else                       bestNormal = new THREE.Vector3(0, 0, dz < 0 ? 1 : -1);
+    let x = Math.floor(camPos.x + 0.5);
+    let y = Math.floor(camPos.y + 0.5);
+    let z = Math.floor(camPos.z + 0.5);
+
+    const dx = camDir.x, dy = camDir.y, dz = camDir.z;
+
+    const stepX = dx > 0 ? 1 : -1;
+    const stepY = dy > 0 ? 1 : -1;
+    const stepZ = dz > 0 ? 1 : -1;
+
+    // tDelta — сколько t нужно пройти чтобы пересечь одну клетку по каждой оси
+    const tDeltaX = Math.abs(1 / dx);
+    const tDeltaY = Math.abs(1 / dy);
+    const tDeltaZ = Math.abs(1 / dz);
+
+    // tMax — t до следующей границы клетки по каждой оси
+    // (расстояние от текущей позиции до ближайшей целой границы)
+    const ox = camPos.x, oy = camPos.y, oz = camPos.z;
+    let tMaxX = dx === 0 ? Infinity : ((stepX > 0 ? (x + 0.5 - ox) : (ox - (x - 0.5))) / Math.abs(dx));
+    let tMaxY = dy === 0 ? Infinity : ((stepY > 0 ? (y + 0.5 - oy) : (oy - (y - 0.5))) / Math.abs(dy));
+    let tMaxZ = dz === 0 ? Infinity : ((stepZ > 0 ? (z + 0.5 - oz) : (oz - (z - 0.5))) / Math.abs(dz));
+
+    let face = 0; // 0=x, 1=y, 2=z — ось последнего шага
+
+    // Проверяем стартовую клетку
+    let entry = blockMap.get(bkey(x, y, z));
+    if (entry && entry.type !== "water" && entry.type !== "lava") {
+        const nx = face === 0 ? -stepX : 0;
+        const ny = face === 1 ? -stepY : 0;
+        const nz = face === 2 ? -stepZ : 0;
+        return { entry, faceNormal: new THREE.Vector3(nx, ny, nz), distance: 0 };
     }
-    return bestEntry ? { entry: bestEntry, faceNormal: bestNormal, distance: bestT } : null;
+
+    for (let i = 0; i < maxDist * 3 + 6; i++) {
+        let t;
+        if (tMaxX < tMaxY && tMaxX < tMaxZ) {
+            x += stepX; t = tMaxX; tMaxX += tDeltaX; face = 0;
+        } else if (tMaxY < tMaxZ) {
+            y += stepY; t = tMaxY; tMaxY += tDeltaY; face = 1;
+        } else {
+            z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; face = 2;
+        }
+        if (t > maxDist) break;
+
+        entry = blockMap.get(bkey(x, y, z));
+        if (entry && entry.type !== "water" && entry.type !== "lava") {
+            const nx = face === 0 ? -stepX : 0;
+            const ny = face === 1 ? -stepY : 0;
+            const nz = face === 2 ? -stepZ : 0;
+            return { entry, faceNormal: new THREE.Vector3(nx, ny, nz), distance: t };
+        }
+    }
+    return null;
 }
 
 // ─── СГЛАЖИВАНИЕ DT ──────────────────────────────────────────────────────────
@@ -772,8 +912,8 @@ const JUMP_FORCE = 0.30;
 const SWIM_UP    = 0.12;
 const WATER_DRAG = 0.78;
 
-const pos     = new THREE.Vector3(0, 20, 12);
-const posPrev = new THREE.Vector3(0, 20, 12);
+const pos     = new THREE.Vector3(0, 20, 15);
+const posPrev = new THREE.Vector3(0, 20, 15);
 
 let velY = 0, onGround = false, inWater = false, inLava = false, accumTime = 0;
 
@@ -977,7 +1117,9 @@ function doBreak() {
     if (!hit) return;
     const broken = hit.entry;
     if (broken.type === "rainbow") { rainbowCount++; updateRainbowUI(); }
+    if (broken.type === "aquarium") removeAquariumFish(broken.x, broken.y, broken.z);
     removeBlock(broken);
+    flushColors();
     currentHit = null;
 }
 
@@ -999,8 +1141,12 @@ function doPlace() {
             selected = "grass";
         }
     } else {
+        addBlock._lastFail = null;
         addBlock(bx, by, bz, selected);
+        if (selected === "aquarium") spawnAquariumFish(bx, by, bz);
+        if (addBlock._lastFail) hudEl._dbg = `addBlock fail: ${addBlock._lastFail}`;
     }
+    flushColors();
 }
 
 document.addEventListener("mousedown", e => {
@@ -1022,6 +1168,8 @@ const ICON_DEF = {
     rainbow: { top: null,      left: null,      right: null,      label: "🌈" },
     lava:    { top: "#ff7043", left: "#bf360c", right: "#8b1a00", label: "🔥" },
     water:   { top: "#42a5f5", left: "#1565c0", right: "#0d47a1", label: "💧" },
+    aquarium:{ top: "#aaeeff", left: "#55bbdd", right: "#2299bb", label: "🐠" },
+    glass:   { top: "#e8f8ff", left: "#b0ddf0", right: "#80bedd", label: "🪟" },
 };
 
 function drawBlockIcon(canvas, type) {
@@ -1037,6 +1185,16 @@ function drawBlockIcon(canvas, type) {
     if (type === "rainbow") {
         // Радужный куб — особая отрисовка с градиентными гранями
         drawRainbowIcon(ctx, S);
+        return;
+    }
+
+    if (type === "aquarium") {
+        drawAquariumIcon(ctx, S);
+        return;
+    }
+
+    if (type === "glass") {
+        drawGlassIcon(ctx, S);
         return;
     }
 
@@ -1182,8 +1340,102 @@ function shadeColor(hex, amt) {
     return `rgb(${r},${g},${b})`;
 }
 
+function drawAquariumIcon(ctx, S) {
+    const W = S * 0.72, H = W * 0.5, FH = S * 0.38;
+    const cx = S / 2, topY = S * 0.14;
+
+    // Top face
+    ctx.beginPath();
+    ctx.moveTo(cx, topY); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx, topY+H); ctx.lineTo(cx-W/2, topY+H/2);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(150,230,255,0.7)"; ctx.fill();
+    ctx.strokeStyle = "rgba(0,150,220,0.5)"; ctx.lineWidth = 0.8; ctx.stroke();
+
+    // Left face — вода с рыбкой
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx-W/2, topY+H/2); ctx.lineTo(cx, topY+H);
+    ctx.lineTo(cx, topY+H+FH); ctx.lineTo(cx-W/2, topY+H/2+FH);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(30,120,200,0.45)"; ctx.fill();
+    ctx.strokeStyle = "rgba(0,100,180,0.6)"; ctx.lineWidth = 0.8; ctx.stroke();
+    // рыбка слева
+    ctx.fillStyle = "#ff9800";
+    ctx.beginPath(); ctx.ellipse(cx-W/3.5, topY+H+FH*0.45, 6, 3.5, 0.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx-W/3.5+6, topY+H+FH*0.45); ctx.lineTo(cx-W/3.5+10, topY+H+FH*0.45-3); ctx.lineTo(cx-W/3.5+10, topY+H+FH*0.45+3); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // Right face — вода с рыбкой
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, topY+H); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx+W/2, topY+H/2+FH); ctx.lineTo(cx, topY+H+FH);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(20,90,160,0.55)"; ctx.fill();
+    ctx.strokeStyle = "rgba(0,80,150,0.6)"; ctx.lineWidth = 0.8; ctx.stroke();
+    // рыбка справа
+    ctx.fillStyle = "#e91e63";
+    ctx.beginPath(); ctx.ellipse(cx+W/4.5, topY+H+FH*0.35, 5, 3, -0.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx+W/4.5-5, topY+H+FH*0.35); ctx.lineTo(cx+W/4.5-9, topY+H+FH*0.35-2.5); ctx.lineTo(cx+W/4.5-9, topY+H+FH*0.35+2.5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // Блик на top
+    ctx.beginPath();
+    ctx.moveTo(cx, topY+2); ctx.lineTo(cx+W/2*0.5, topY+H/2*0.5);
+    ctx.lineTo(cx, topY+H*0.5); ctx.lineTo(cx-W/2*0.5, topY+H/2*0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fill();
+}
+
+function drawGlassIcon(ctx, S) {
+    const W = S * 0.72, H = W * 0.5, FH = S * 0.38;
+    const cx = S / 2, topY = S * 0.14;
+
+    // Top face — почти прозрачная
+    ctx.beginPath();
+    ctx.moveTo(cx, topY); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx, topY+H); ctx.lineTo(cx-W/2, topY+H/2);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(210,240,255,0.55)"; ctx.fill();
+    ctx.strokeStyle = "rgba(120,190,230,0.7)"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Left face
+    ctx.beginPath();
+    ctx.moveTo(cx-W/2, topY+H/2); ctx.lineTo(cx, topY+H);
+    ctx.lineTo(cx, topY+H+FH); ctx.lineTo(cx-W/2, topY+H/2+FH);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(140,200,230,0.38)"; ctx.fill();
+    ctx.strokeStyle = "rgba(80,150,200,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Right face
+    ctx.beginPath();
+    ctx.moveTo(cx, topY+H); ctx.lineTo(cx+W/2, topY+H/2);
+    ctx.lineTo(cx+W/2, topY+H/2+FH); ctx.lineTo(cx, topY+H+FH);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(100,170,210,0.45)"; ctx.fill();
+    ctx.strokeStyle = "rgba(60,120,180,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Крупный блик — характерная черта стекла
+    ctx.beginPath();
+    ctx.moveTo(cx - W*0.08, topY + H*0.18);
+    ctx.lineTo(cx - W*0.28, topY + H*0.46);
+    ctx.lineTo(cx - W*0.22, topY + H*0.52);
+    ctx.lineTo(cx - W*0.02, topY + H*0.24);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fill();
+
+    // Малый блик
+    ctx.beginPath();
+    ctx.moveTo(cx + W*0.05, topY + H*0.08);
+    ctx.lineTo(cx + W*0.18, topY + H*0.22);
+    ctx.lineTo(cx + W*0.14, topY + H*0.26);
+    ctx.lineTo(cx + W*0.01, topY + H*0.12);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fill();
+}
+
 // Отрисовываем все иконки при старте
-["grass","stone","wood","leaf","sand","rainbow"].forEach(type => {
+["grass","stone","wood","leaf","sand","rainbow","aquarium","glass"].forEach(type => {
     const c = document.getElementById("icon-" + type);
     if (c) drawBlockIcon(c, type);
 });
@@ -1209,7 +1461,7 @@ function updateRainbowUI() {
 updateRainbowUI();
 
 // ─── ВЫБОР СЛОТА ─────────────────────────────────────────────────────────────
-const SLOT_TYPES = ["grass","stone","wood","leaf","sand","rainbow"];
+const SLOT_TYPES = ["grass","stone","wood","leaf","sand","rainbow","aquarium","glass"];
 
 function selectSlot(idx) {
     const type = SLOT_TYPES[idx];
@@ -1223,11 +1475,20 @@ function selectSlot(idx) {
 }
 
 // Клик мышью по слоту — работает всегда (pointer lock не мешает)
-document.querySelectorAll(".slot").forEach((slot, idx) => {
+document.querySelectorAll(".slot").forEach((slot) => {
+    const type = slot.dataset.type;
     slot.addEventListener("mousedown", e => {
-        e.stopPropagation(); // не даём canvas перехватить
-        selectSlot(idx);
+        e.stopPropagation();
+        const idx = SLOT_TYPES.indexOf(type);
+        if (idx >= 0) selectSlot(idx);
     });
+    // На мобильном — touchstart, иначе look-zone перехватывает
+    slot.addEventListener("touchstart", e => {
+        e.stopPropagation();
+        e.preventDefault();
+        const idx = SLOT_TYPES.indexOf(type);
+        if (idx >= 0) selectSlot(idx);
+    }, { passive: false });
 });
 
 // Цифры 1–6 и Tab
@@ -1359,6 +1620,21 @@ const fpsEl = document.getElementById("fps");
 const hudEl = document.getElementById("hud");
 let fpsFrames = 0, fpsAccum = 0;
 
+// ─── ПРОФАЙЛЕР ───────────────────────────────────────────────────────────────
+const profilerEl = document.getElementById("profiler");
+let profilerOn = false;
+document.addEventListener("keydown", e => {
+    if (e.code === "F3") { e.preventDefault(); profilerOn = !profilerOn; profilerEl.style.display = profilerOn ? "block" : "none"; }
+});
+
+// Скользящее среднее за ~60 кадров для каждой секции
+const PROF_ALPHA = 0.05; // EMA: 0.05 ≈ среднее за ~20 кадров
+const profStats = {};
+function profMark(name, ms) {
+    if (!profStats[name]) profStats[name] = ms;
+    profStats[name] = profStats[name] * (1 - PROF_ALPHA) + ms * PROF_ALPHA;
+}
+
 // ─── ГЛАВНЫЙ ЦИКЛ ────────────────────────────────────────────────────────────
 let lastRafTime = -1, simTime = 0;
 const underwaterDiv  = document.getElementById("underwater");
@@ -1378,15 +1654,32 @@ function animate(now) {
         fpsEl.textContent = fps + " FPS";
         fpsEl.style.color = fps >= 50 ? "#0f0" : fps >= 30 ? "#ff0" : "#f44";
         fpsFrames = 0; fpsAccum = 0;
+
+        if (profilerOn) {
+            const order = ["physics","fish","pigs","clouds","buildQueue","torchLight","raycast","render","TOTAL"];
+            const lines = order.map(k => {
+                const v = profStats[k];
+                if (v === undefined) return null;
+                const ms = v.toFixed(2);
+                const bar = "█".repeat(Math.min(20, Math.round(v * 4)));
+                const color = v > 8 ? "#f44" : v > 3 ? "#ff0" : "#0f0";
+                return `<span style="color:${color}">${k.padEnd(12)}${ms.padStart(5)}ms ${bar}</span>`;
+            }).filter(Boolean);
+            profilerEl.innerHTML = "<b style='color:#fff'>F3 — профайлер</b><br>" + lines.join("<br>");
+        }
     }
 
+    let t0, t1;
+
     accumTime += dt;
-    posPrev.copy(pos);  // сохраняем позицию ДО всех тиков кадра
+    posPrev.copy(pos);
+    t0 = performance.now();
     while (accumTime >= FIXED_DT) {
         physicsTick();
         accumTime -= FIXED_DT;
         simTime += FIXED_DT;
     }
+    if (profilerOn) profMark("physics", performance.now() - t0);
 
     const alpha = Math.min(accumTime / FIXED_DT, 1);
     interpPos.lerpVectors(posPrev, pos, alpha);
@@ -1394,8 +1687,9 @@ function animate(now) {
     camera.rotation.y = yaw;
     camera.rotation.x = pitch;
 
-    // Координаты в HUD
-    hudEl.textContent = `X: ${Math.round(pos.x)} \u00a0 Y: ${Math.round(feetY())} \u00a0 Z: ${Math.round(pos.z)}`;
+    // Координаты + выбранный блок в HUD
+    hudEl.textContent = `X:${Math.round(pos.x)} \u00a0 Y:${Math.round(feetY())} \u00a0 Z:${Math.round(pos.z)}`;
+    if (hudEl._dbg) hudEl.textContent += `\n${hudEl._dbg}`;
 
     // Оверлеи
     const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
@@ -1404,46 +1698,69 @@ function animate(now) {
     lavaOverlayDiv.style.display = headInLava  ? "block" : "none";
 
     // Рыбы — LOD по дистанции
+    t0 = performance.now();
     for (const fish of fishGroup) {
         const d = fish.userData;
         const lod = entityLOD(d.cx, d.cz);
         if (lod === "far") { fish.visible = false; continue; }
         fish.visible = true;
-        // MID — обновляем каждые 3 кадра
         if (lod === "mid" && (simTime * 60 | 0) % 3 !== 0) continue;
         d.angle += d.speed;
         fish.position.x = d.cx + Math.cos(d.angle) * d.radius;
         fish.position.z = d.cz + Math.sin(d.angle) * d.radius;
         fish.position.y = d.cy + Math.sin(simTime * 2 + d.wobble) * 0.1;
         fish.rotation.y = -d.angle + Math.PI / 2;
-        // Виляние хвостом — только NEAR
         if (lod === "near") fish.children[1].rotation.y = Math.sin(simTime * 9 + d.wobble) * 0.4;
     }
+    updateAquariumFish(simTime);
+    if (profilerOn) profMark("fish", performance.now() - t0);
 
     // Свиньи
+    t0 = performance.now();
     updatePigs(simTime);
+    if (profilerOn) profMark("pigs", performance.now() - t0);
 
-    // Облака — обновляем всегда (движутся медленно), но скрываем очень далёкие
+    // Облака
+    t0 = performance.now();
     for (const c of clouds) {
         c.position.x += c.userData.speed;
         if (c.position.x > 120) c.position.x = -120;
-        // Облака высоко — LOD только по X/Z
         const cdx = c.position.x - interpPos.x, cdz = c.position.z - interpPos.z;
         c.visible = (cdx*cdx + cdz*cdz) < 150*150;
     }
+    if (profilerOn) profMark("clouds", performance.now() - t0);
 
+    // Очередь чанков
+    t0 = performance.now();
     processBuildQueue();
+    if (profilerOn) profMark("buildQueue", performance.now() - t0);
 
-    // Подсветка от "факела" игрока — блоки рядом всегда видны
+    // Подсветка от "факела"
+    t0 = performance.now();
     updateTorchLight(interpPos.x, interpPos.y, interpPos.z);
+    if (profilerOn) profMark("torchLight", performance.now() - t0);
 
+    // Рейкаст
+    t0 = performance.now();
     _rayOrig.copy(interpPos);
     _rayDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
     const hit = castRay(_rayOrig, _rayDir, 6);
     if (hit) { highlight.visible = true; highlight.position.set(hit.entry.x, hit.entry.y, hit.entry.z); currentHit = hit; }
     else      { highlight.visible = false; currentHit = null; }
+    if (profilerOn) profMark("raycast", performance.now() - t0);
 
+    // Рендер
+    t0 = performance.now();
     renderer.render(scene, camera);
+    t1 = performance.now();
+    if (profilerOn) {
+        profMark("render", t1 - t0);
+        profMark("TOTAL", (t1 - (now)) + rawDt * 1000 * 0); // общее время кадра
+        // Считаем TOTAL как сумму всех секций
+        const total = ["physics","fish","pigs","clouds","buildQueue","torchLight","raycast","render"]
+            .reduce((s, k) => s + (profStats[k] || 0), 0);
+        profStats["TOTAL"] = total;
+    }
 }
 
 scheduleChunks(0, 0);
