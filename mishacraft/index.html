@@ -9,6 +9,60 @@
 * { box-sizing: border-box; }
 body { margin: 0; overflow: hidden; background: #000; }
 
+/* ── ЗАСТАВКА ── */
+#splash {
+    position: fixed; inset: 0; background: #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 1000;
+}
+/* Автофейд убран — сплэш закрывается только после выбора в меню */
+
+#splash-svg g[id^="pb"] > g,
+#splash-svg g[id^="pr"] > g,
+#splash-svg g[id^="po"] > g,
+#splash-svg g[id^="py"] > g,
+#splash-svg g[id^="pg"] > g { opacity: 0; animation: blockPop 0.15s ease forwards; }
+
+#splash-menu {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    opacity: 0; transition: opacity 0.5s;
+    pointer-events: none;
+    margin-top: 20px;
+}
+#splash-menu.visible { opacity: 1; pointer-events: auto; }
+
+.menu-btn {
+    font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold;
+    color: #fff; letter-spacing: 2px;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 10px;
+    padding: 12px 36px;
+    cursor: pointer; user-select: none;
+    width: 240px; text-align: center;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.menu-btn:hover  { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.5); transform: translateY(-2px); }
+.menu-btn:active { transform: translateY(0); }
+.menu-btn.new-game  { border-color: rgba(80,200,100,0.6); }
+.menu-btn.new-game:hover  { background: rgba(80,200,100,0.2); border-color: #5c8; }
+.menu-btn.load-game { border-color: rgba(80,160,255,0.6); }
+.menu-btn.load-game:hover { background: rgba(80,160,255,0.2); border-color: #5af; }
+.menu-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
+
+#menu-hint {
+    font-family: monospace; font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 4px; min-height: 18px; text-align: center;
+}
+
+@keyframes blockPop {
+    0%   { opacity:0; transform: scale(0.4) translateY(-20px); }
+    70%  { opacity:1; transform: scale(1.15) translateY(2px); }
+    100% { opacity:1; transform: scale(1) translateY(0); }
+}
+
 #crosshair {
     position: fixed; top: 50%; left: 50%;
     width: 14px; height: 14px; margin: -7px 0 0 -7px;
@@ -132,6 +186,34 @@ body { margin: 0; overflow: hidden; background: #000; }
 }
 #btn-place:active { background: rgba(60,180,80,0.7); }
 
+#btn-save {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 30;
+    background: rgba(30,30,30,0.75);
+    border: 1.5px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
+    color: #fff; font-size: 18px;
+    padding: 4px 14px 4px 10px;
+    cursor: pointer; user-select: none;
+    letter-spacing: 1px;
+    transition: background 0.15s, border-color 0.15s;
+}
+#btn-save:hover { background: rgba(60,60,60,0.9); border-color: rgba(255,255,255,0.5); }
+#btn-save:active { background: rgba(0,180,80,0.5); }
+#btn-save.saving { border-color: #0f0; }
+
+#save-toast {
+    position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+    z-index: 30;
+    background: rgba(0,0,0,0.72);
+    color: #0f0; font-family: monospace; font-size: 13px;
+    padding: 4px 14px; border-radius: 6px;
+    pointer-events: none;
+    opacity: 0; transition: opacity 0.3s;
+    white-space: nowrap;
+}
+#save-toast.visible { opacity: 1; }
+
 /* Зона свайпа камеры — вся правая половина экрана */
 #look-zone {
     position: fixed; right: 0; top: 0;
@@ -148,6 +230,63 @@ body { margin: 0; overflow: hidden; background: #000; }
 </head>
 <body>
 
+<div id="splash">
+  <svg id="splash-svg" viewBox="0 0 680 480" xmlns="http://www.w3.org/2000/svg" style="width:min(90vw,600px);height:auto">
+    <!-- Надпись MishaCraft -->
+    <text x="340" y="55" text-anchor="middle" font-family="'Courier New',monospace" font-size="42" font-weight="bold" letter-spacing="5">
+      <tspan fill="#ff3333">M</tspan><tspan fill="#ff7700">i</tspan><tspan fill="#ffdd00">s</tspan><tspan fill="#44cc44">h</tspan><tspan fill="#3399ff">a</tspan><tspan fill="#9944dd">C</tspan><tspan fill="#ff44aa">r</tspan><tspan fill="#ff3333">a</tspan><tspan fill="#ff7700">f</tspan><tspan fill="#ffdd00">t</tspan>
+    </text>
+
+    <!-- КРАСНАЯ деталь (верх-лево) — Г: 1 блок влево + 3 вверх -->
+    <g id="pr">
+      <g><polygon points="112,166 130,157 148,166 130,175" fill="#e05050"/><polygon points="112,166 112,184 130,193 130,175" fill="#a02020"/><polygon points="130,175 130,193 148,184 148,166" fill="#c03030"/></g>
+      <g><polygon points="130,148 148,139 166,148 148,157" fill="#e05050"/><polygon points="130,148 130,166 148,175 148,157" fill="#a02020"/><polygon points="148,157 148,175 166,166 166,148" fill="#c03030"/></g>
+      <g><polygon points="130,130 148,121 166,130 148,139" fill="#e05050"/><polygon points="130,130 130,148 148,157 148,139" fill="#a02020"/><polygon points="148,139 148,157 166,148 166,130" fill="#c03030"/></g>
+      <g><polygon points="130,112 148,103 166,112 148,121" fill="#e05050"/><polygon points="130,112 130,130 148,139 148,121" fill="#a02020"/><polygon points="148,121 148,139 166,130 166,112" fill="#c03030"/></g>
+    </g>
+
+    <!-- ОРАНЖЕВАЯ деталь — S -->
+    <g id="po">
+      <g><polygon points="218,228 236,219 254,228 236,237" fill="#e09040"/><polygon points="218,228 218,246 236,255 236,237" fill="#a05818"/><polygon points="236,237 236,255 254,246 254,228" fill="#c07028"/></g>
+      <g><polygon points="236,210 254,201 272,210 254,219" fill="#e09040"/><polygon points="236,210 236,228 254,237 254,219" fill="#a05818"/><polygon points="254,219 254,237 272,228 272,210" fill="#c07028"/></g>
+      <g><polygon points="236,192 254,183 272,192 254,201" fill="#e09040"/><polygon points="236,192 236,210 254,219 254,201" fill="#a05818"/><polygon points="254,201 254,219 272,210 272,192" fill="#c07028"/></g>
+      <g><polygon points="254,174 272,165 290,174 272,183" fill="#e09040"/><polygon points="254,174 254,192 272,201 272,183" fill="#a05818"/><polygon points="272,183 272,201 290,192 290,174" fill="#c07028"/></g>
+    </g>
+
+    <!-- ЖЁЛТАЯ деталь (центр-низ) — T -->
+    <g id="py">
+      <g><polygon points="272,300 290,291 308,300 290,309" fill="#d4c040"/><polygon points="272,300 272,318 290,327 290,309" fill="#8c7c10"/><polygon points="290,309 290,327 308,318 308,300" fill="#a89820"/></g>
+      <g><polygon points="290,282 308,273 326,282 308,291" fill="#d4c040"/><polygon points="290,282 290,300 308,309 308,291" fill="#8c7c10"/><polygon points="308,291 308,309 326,300 326,282" fill="#a89820"/></g>
+      <g><polygon points="308,264 326,255 344,264 326,273" fill="#d4c040"/><polygon points="308,264 308,282 326,291 326,273" fill="#8c7c10"/><polygon points="326,273 326,291 344,282 344,264" fill="#a89820"/></g>
+      <g><polygon points="290,300 308,291 326,300 308,309" fill="#d4c040"/><polygon points="290,300 290,318 308,327 308,309" fill="#8c7c10"/><polygon points="308,309 308,327 326,318 326,300" fill="#a89820"/></g>
+    </g>
+
+    <!-- ЗЕЛЁНАЯ деталь — L -->
+    <g id="pg">
+      <g><polygon points="380,264 398,255 416,264 398,273" fill="#50b060"/><polygon points="380,264 380,282 398,291 398,273" fill="#1a6828"/><polygon points="398,273 398,291 416,282 416,264" fill="#308840"/></g>
+      <g><polygon points="380,246 398,237 416,246 398,255" fill="#50b060"/><polygon points="380,246 380,264 398,273 398,255" fill="#1a6828"/><polygon points="398,255 398,273 416,264 416,246" fill="#308840"/></g>
+      <g><polygon points="380,228 398,219 416,228 398,237" fill="#50b060"/><polygon points="380,228 380,246 398,255 398,237" fill="#1a6828"/><polygon points="398,237 398,255 416,246 416,228" fill="#308840"/></g>
+      <g><polygon points="398,273 416,264 434,273 416,282" fill="#50b060"/><polygon points="398,273 398,291 416,300 416,282" fill="#1a6828"/><polygon points="416,282 416,300 434,291 434,273" fill="#308840"/></g>
+    </g>
+
+    <!-- СИНЯЯ деталь (верх-право) — Z -->
+    <g id="pb">
+      <g><polygon points="468,192 486,183 504,192 486,201" fill="#4060cc"/><polygon points="468,192 468,210 486,219 486,201" fill="#0f1e7a"/><polygon points="486,201 486,219 504,210 504,192" fill="#2040aa"/></g>
+      <g><polygon points="486,174 504,165 522,174 504,183" fill="#4060cc"/><polygon points="486,174 486,192 504,201 504,183" fill="#0f1e7a"/><polygon points="504,183 504,201 522,192 522,174" fill="#2040aa"/></g>
+      <g><polygon points="486,156 504,147 522,156 504,165" fill="#4060cc"/><polygon points="486,156 486,174 504,183 504,165" fill="#0f1e7a"/><polygon points="504,165 504,183 522,174 522,156" fill="#2040aa"/></g>
+      <g><polygon points="504,138 522,129 540,138 522,147" fill="#4060cc"/><polygon points="504,138 504,156 522,165 522,147" fill="#0f1e7a"/><polygon points="522,147 522,165 540,156 540,138" fill="#2040aa"/></g>
+    </g>
+
+    <text x="340" y="445" text-anchor="middle" font-family="monospace" font-size="13" fill="rgba(255,255,255,0.0)"> </text>
+  </svg>
+
+  <div id="splash-menu">
+    <button class="menu-btn new-game" id="btn-new-game">🌍 НОВАЯ ИГРА</button>
+    <button class="menu-btn load-game" id="btn-load-game" disabled>💾 ЗАГРУЗИТЬ</button>
+    <div id="menu-hint">проверяем сохранение…</div>
+  </div>
+</div>
+
 <div id="crosshair"></div>
 <div id="underwater"></div>
 <div id="lava-overlay"></div>
@@ -161,6 +300,10 @@ body { margin: 0; overflow: hidden; background: #000; }
     padding:5px 8px; border-radius:6px; display:none;
 "></div>
 <div id="loading"></div>
+
+<button id="btn-save" title="Сохранить мир (S)">💾</button>
+<div id="save-toast"></div>
+
 <div id="inventory">
     <div class="slot active" data-type="grass"><canvas id="icon-grass"></canvas></div>
     <div class="slot" data-type="stone"><canvas id="icon-stone"></canvas></div>
@@ -212,7 +355,7 @@ scene.add(sun);
 const BGEO = new THREE.BoxGeometry(1, 1, 1);
 const MAX_INST = 200000; // дефолт
 const MAX_INST_BY_TYPE = {
-    stone: 20000, // самый распространённый — подземные слои
+    stone: 20000,
     grass: 60000,
     sand:  30000,
     water: 30000,
@@ -419,6 +562,178 @@ const freeList = {};
 for (const t of BLOCK_TYPES) freeList[t] = [];
 // solidEntries removed — DDA не нуждается в списке солидных блоков
 
+// ─── СИСТЕМА СОХРАНЕНИЯ ──────────────────────────────────────────────────────
+// Храним только дельту: блоки поставленные игроком (placed) и снесённые (removed).
+// При загрузке: сначала генерируем мир, потом накатываем дельту.
+
+const userPlaced  = new Map();   // bkey → {x,y,z,type}  — поставил игрок
+const userRemoved = new Set();   // bkey              — снёс игрок (был генерированным)
+
+// Метки: какие блоки пришли из генератора (не от игрока)
+const worldGenKeys = new Set();
+let   worldGenDone = false;      // true после загрузки стартовых чанков
+
+let _isSaving = false;
+const saveBtn   = document.getElementById("btn-save");
+const saveToast = document.getElementById("save-toast");
+
+function showToast(msg, color = "#0f0", ms = 2000) {
+    saveToast.textContent = msg;
+    saveToast.style.color = color;
+    saveToast.classList.add("visible");
+    clearTimeout(saveToast._t);
+    saveToast._t = setTimeout(() => saveToast.classList.remove("visible"), ms);
+}
+
+// ── IndexedDB helpers (Cordova-safe) ─────────────────────────────────────────
+// На Android 13/14 через Cordova WebView:
+//  - IndexedDB работает, но открывать нужно ПОСЛЕ deviceready
+//  - Запрашиваем persistent storage чтобы Android не вычистил данные
+//  - Кэшируем открытый экземпляр db чтобы не открывать заново на каждую операцию
+//  - Используем tx.oncomplete вместо req.onsuccess для write-транзакций
+//    (некоторые WebView закрывают транзакцию до того как req.onsuccess сработает)
+
+const DB_NAME    = "mishaCraft";
+const DB_VERSION = 1;
+const STORE_NAME = "world";
+let   _dbInstance = null;
+
+// Запросить persistent quota (важно на Android — без этого ОС может вычистить данные)
+function requestPersistentStorage() {
+    if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then(granted => {
+            console.log("Persistent storage:", granted ? "granted" : "denied");
+        }).catch(() => {});
+    }
+}
+
+function openDB() {
+    if (_dbInstance) return Promise.resolve(_dbInstance);
+    return new Promise((res, rej) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+        req.onsuccess = e => {
+            _dbInstance = e.target.result;
+            // Если соединение внезапно закрылось (Android может убить WebView) — сбрасываем кэш
+            _dbInstance.onclose = () => { _dbInstance = null; };
+            _dbInstance.onerror = e => console.error("DB error:", e.target.error);
+            res(_dbInstance);
+        };
+        req.onerror   = e => rej(e.target.error);
+        req.onblocked = () => {
+            // Другая вкладка держит старую версию БД
+            _dbInstance = null;
+            rej(new Error("IDB blocked"));
+        };
+    });
+}
+
+async function dbPut(key, value) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+        let tx;
+        try {
+            tx = db.transaction(STORE_NAME, "readwrite");
+        } catch(e) {
+            // Транзакция не открылась (db закрыта) — сбрасываем и пробуем переоткрыть
+            _dbInstance = null;
+            return rej(e);
+        }
+        tx.oncomplete = () => res();
+        tx.onerror    = e => rej(e.target.error);
+        tx.onabort    = e => rej(e.target.error);
+        tx.objectStore(STORE_NAME).put(value, key);
+    });
+}
+
+async function dbGet(key) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+        let tx;
+        try {
+            tx = db.transaction(STORE_NAME, "readonly");
+        } catch(e) {
+            _dbInstance = null;
+            return rej(e);
+        }
+        tx.onerror = e => rej(e.target.error);
+        const req  = tx.objectStore(STORE_NAME).get(key);
+        req.onsuccess = e => res(e.target.result);
+        req.onerror   = e => rej(e.target.error);
+    });
+}
+
+// ── Сохранение ───────────────────────────────────────────────────────────────
+async function saveWorld() {
+    if (_isSaving) return;
+    _isSaving = true;
+    saveBtn.classList.add("saving");
+    saveBtn.textContent = "⏳";
+    try {
+        const placed  = [...userPlaced.values()];
+        const removed = [...userRemoved];
+        await dbPut("delta", { seed: _worldSeed, placed, removed });
+        const total = placed.length + removed.length;
+        showToast(`✓ Сохранено (${total} изменений)`);
+    } catch(e) {
+        showToast("✗ Ошибка сохранения", "#f44");
+        console.error("saveWorld:", e);
+    } finally {
+        _isSaving = false;
+        saveBtn.classList.remove("saving");
+        saveBtn.textContent = "💾";
+    }
+}
+
+// ── Загружаем seed и дельту; вызывается ДО генерации мира ────────────────────
+async function initWorldFromDB() {
+    try {
+        const saved = await dbGet("delta");
+        const seed  = saved?.seed ?? (Math.random() * 0xFFFFFFFF | 0);
+        initWorldSeed(seed);
+        return saved; // вернём для накатки дельты после генерации
+    } catch(e) {
+        console.error("initWorldFromDB:", e);
+        initWorldSeed(Math.random() * 0xFFFFFFFF | 0);
+        return null;
+    }
+}
+
+async function loadWorldDelta(saved) {
+    try {
+        const delta = saved;
+        if (!delta) return;
+        let applied = 0;
+
+        // Сначала убираем блоки которые игрок снёс
+        for (const k of delta.removed) {
+            const entry = blockMap.get(k);
+            if (entry) { removeBlock(entry); applied++; }
+            userRemoved.add(k);
+        }
+
+        // Потом ставим блоки которые игрок добавил
+        for (const b of delta.placed) {
+            const k = bkey(b.x, b.y, b.z);
+            const existing = blockMap.get(k);
+            if (existing) removeBlock(existing);
+            addBlock(b.x, b.y, b.z, b.type);
+            userPlaced.set(k, { x: b.x, y: b.y, z: b.z, type: b.type });
+            applied++;
+        }
+
+        flushColors();
+        if (applied > 0) showToast(`↑ Загружено (${applied} изменений)`, "#8cf");
+    } catch(e) {
+        console.error("loadWorldDelta:", e);
+    }
+}
+
 let selected = "grass";
 
 function bkey(x, y, z) { return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`; }
@@ -455,6 +770,8 @@ function addBlock(x, y, z, type) {
     markColorDirty(type);
     // Новый блок может стать вершиной своей колонки
     skyColumnAdd(rx, ry, rz);
+    // Пометить как мировой блок если генерация ещё идёт
+    if (!worldGenDone) worldGenKeys.add(k);
 }
 
 function removeBlock(entry) {
@@ -478,13 +795,38 @@ function isWaterAt(x, y, z) { return waterSet.has(bkey(x, y, z)); }
 function isLavaAt(x, y, z)  { return lavaSet.has(bkey(x, y, z)); }
 
 // ─── ШУМ ПЕРЛИНА ─────────────────────────────────────────────────────────────
-const perm = new Uint8Array(512);
-(() => {
+// Используем seeded RNG чтобы карта была одинаковой при каждом запуске.
+// seed сохраняется в IndexedDB при первом запуске и загружается при последующих.
+
+let _worldSeed = 0;
+
+// Mulberry32 — быстрый seeded PRNG с хорошим распределением
+function makeRng(seed) {
+    return function() {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+// rng будет заменён на seeded версию в initWorldSeed()
+let rng = Math.random;
+
+function initWorldSeed(seed) {
+    _worldSeed = seed;
+    rng = makeRng(seed);
+    // Инициализируем таблицу перестановок Перлина используя seeded RNG
     const p = new Uint8Array(256);
     for (let i = 0; i < 256; i++) p[i] = i;
-    for (let i = 255; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [p[i], p[j]] = [p[j], p[i]]; }
+    for (let i = 255; i > 0; i--) {
+        const j = rng() * (i + 1) | 0;
+        const tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+    }
     for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-})();
+}
+
+const perm = new Uint8Array(512);
 function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 function lrp(a, b, t) { return a + t * (b - a); }
 function grad2(h, x, y) { const u = h < 8 ? x : y, v = h < 4 ? y : x; return ((h & 1) ? -u : u) + ((h & 2) ? -v : v); }
@@ -583,8 +925,8 @@ function generateChunk(cx, cz) {
                 for (let y = DEEP_LIMIT; y < top; y++) addBlock(x, y, z, undergroundType(x, y, z));
                 const surfaceType = top >= 18 ? "stone" : "grass";
                 addBlock(x, top, z, surfaceType);
-                if (surfaceType === "grass" && Math.random() < 0.035) {
-                    const th = 3 + (Math.random() < 0.3 ? 1 : 0);
+                if (surfaceType === "grass" && rng() < 0.035) {
+                    const th = 3 + (rng() < 0.3 ? 1 : 0);
                     for (let y = 1; y <= th; y++) addBlock(x, top + y, z, "wood");
                     for (let lx = -1; lx <= 1; lx++)
                         for (let lz = -1; lz <= 1; lz++)
@@ -1116,11 +1458,18 @@ function doBreak() {
     const hit = getHit();
     if (!hit) return;
     const broken = hit.entry;
+    const k = bkey(broken.x, broken.y, broken.z);
     if (broken.type === "rainbow") { rainbowCount++; updateRainbowUI(); }
     if (broken.type === "aquarium") removeAquariumFish(broken.x, broken.y, broken.z);
     removeBlock(broken);
     flushColors();
     currentHit = null;
+    // Трекинг дельты
+    if (userPlaced.has(k)) {
+        userPlaced.delete(k);          // убрал свой же блок — просто стираем
+    } else if (worldGenKeys.has(k)) {
+        userRemoved.add(k);            // снёс мировой блок
+    }
 }
 
 function doPlace() {
@@ -1145,6 +1494,12 @@ function doPlace() {
         addBlock(bx, by, bz, selected);
         if (selected === "aquarium") spawnAquariumFish(bx, by, bz);
         if (addBlock._lastFail) hudEl._dbg = `addBlock fail: ${addBlock._lastFail}`;
+        else {
+            // Трекинг дельты — фиксируем поставленный блок
+            const pk = bkey(bx, by, bz);
+            userPlaced.set(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
+            userRemoved.delete(pk); // если ставим туда где сносили — убираем из removed
+        }
     }
     flushColors();
 }
@@ -1625,7 +1980,12 @@ const profilerEl = document.getElementById("profiler");
 let profilerOn = false;
 document.addEventListener("keydown", e => {
     if (e.code === "F3") { e.preventDefault(); profilerOn = !profilerOn; profilerEl.style.display = profilerOn ? "block" : "none"; }
+    if (e.code === "KeyS" && !e.ctrlKey && !e.metaKey && document.pointerLockElement === renderer.domElement) {
+        e.preventDefault(); saveWorld();
+    }
 });
+
+saveBtn.addEventListener("click", () => saveWorld());
 
 // Скользящее среднее за ~60 кадров для каждой секции
 const PROF_ALPHA = 0.05; // EMA: 0.05 ≈ среднее за ~20 кадров
@@ -1763,14 +2123,82 @@ function animate(now) {
     }
 }
 
-scheduleChunks(0, 0);
-requestAnimationFrame(animate);
+// ─── СТАРТ ───────────────────────────────────────────────────────────────────
+
+const splashEl   = document.getElementById("splash");
+const splashMenu = document.getElementById("splash-menu");
+const btnNewGame = document.getElementById("btn-new-game");
+const btnLoadGame= document.getElementById("btn-load-game");
+const menuHint   = document.getElementById("menu-hint");
+
+function hideSplash() {
+    splashEl.style.transition = "opacity 0.4s";
+    splashEl.style.opacity = "0";
+    splashEl.style.pointerEvents = "none";
+    setTimeout(() => { splashEl.style.display = "none"; }, 420);
+}
+
+async function startGame(loadSave) {
+    hideSplash();
+    requestPersistentStorage();
+    if (loadSave) {
+        const saved = await initWorldFromDB();
+        scheduleChunks(0, 0);
+        worldGenDone = true;
+        await loadWorldDelta(saved);
+    } else {
+        initWorldSeed(Math.random() * 0xFFFFFFFF | 0);
+        scheduleChunks(0, 0);
+        worldGenDone = true;
+    }
+    requestAnimationFrame(animate);
+}
+
+async function onReady() {
+    // Анимация логотипа играет ~2с — показываем меню после неё
+    const pieceOrder = ["pr","po","py","pg","pb"];
+    let delay = 0.1;
+    pieceOrder.forEach(id => {
+        document.querySelectorAll(`#${id} > g`).forEach(block => {
+            block.style.animationDelay = delay.toFixed(2) + "s";
+            block.style.transformOrigin = "center center";
+            delay += 0.12;
+        });
+        delay += 0.15;
+    });
+    // Показываем меню сразу, не ждём анимации логотипа
+    splashMenu.classList.add("visible");
+
+    // Параллельно проверяем наличие сохранения
+    let hasSave = false;
+    try {
+        const saved = await dbGet("delta");
+        hasSave = !!(saved && (saved.placed?.length || saved.removed?.length));
+    } catch(e) { /* БД недоступна */ }
+
+    if (hasSave) {
+        btnLoadGame.disabled = false;
+        menuHint.textContent = "найдено сохранение";
+    } else {
+        menuHint.textContent = "сохранений нет";
+    }
+
+    btnNewGame.addEventListener("click",  () => startGame(false));
+    btnLoadGame.addEventListener("click", () => startGame(true));
+}
 
 window.addEventListener("resize", () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
 });
+
+const IS_CORDOVA = typeof window.cordova !== "undefined";
+if (IS_CORDOVA) {
+    document.addEventListener("deviceready", onReady, { once: true });
+} else {
+    onReady();
+}
 </script>
 </body>
 </html>
