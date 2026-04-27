@@ -57,6 +57,21 @@ body { margin: 0; overflow: hidden; background: #000; }
     margin-top: 4px; min-height: 18px; text-align: center;
 }
 
+#lang-select {
+    font-family: 'Courier New', monospace; font-size: 14px;
+    color: #fff; background: rgba(255,255,255,0.08);
+    border: 1.5px solid rgba(255,255,255,0.25); border-radius: 8px;
+    padding: 7px 32px 7px 12px; cursor: pointer; outline: none;
+    width: 140px; text-align: left;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(255,255,255,0.5)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    transition: border-color 0.15s, background-color 0.15s;
+    position: absolute; top: 16px; right: 16px;
+}
+#lang-select:hover  { border-color: rgba(255,255,255,0.5); background-color: rgba(255,255,255,0.14); }
+#lang-select option { background: #1a1a2e; color: #fff; }
+
 @keyframes blockPop {
     0%   { opacity:0; transform: scale(0.4) translateY(-20px); }
     70%  { opacity:1; transform: scale(1.15) translateY(2px); }
@@ -281,7 +296,12 @@ body { margin: 0; overflow: hidden; background: #000; }
   </svg>
 
   <div id="splash-menu">
-    <button class="menu-btn new-game" id="btn-new-game">🌍 НОВАЯ ИГРА</button>
+    <select id="lang-select">
+      <option value="ru">🇷🇺 Русский</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="de">🇩🇪 Deutsch</option>
+    </select>
+    <button class="menu-btn new-game"  id="btn-new-game">🌍 НОВАЯ ИГРА</button>
     <button class="menu-btn load-game" id="btn-load-game" disabled>💾 ЗАГРУЗИТЬ</button>
     <div id="menu-hint">проверяем сохранение…</div>
   </div>
@@ -437,7 +457,7 @@ for (const t of BLOCK_TYPES) {
 // физики. Обновляется только при изменении блоков рядом с игроком.
 
 const SURFACE_Y   = 0;
-const DEEP_Y      = -50;
+const DEEP_Y      = -15;
 const MIN_BRIGHT  = 0.38;   // было 0.12 — теперь даже в глубокой шахте видно
 const SKY_BONUS   = 0.55;   // было 0.35 — открытое небо сверху даёт много света
 const SKY_CHECK_H = 40;
@@ -679,9 +699,9 @@ async function saveWorld() {
         const removed = [...userRemoved];
         await dbPut("delta", { seed: _worldSeed, placed, removed });
         const total = placed.length + removed.length;
-        showToast(`✓ Сохранено (${total} изменений)`);
+        showToast(t("saved", total));
     } catch(e) {
-        showToast("✗ Ошибка сохранения", "#f44");
+        showToast(t("saveErr"), "#f44");
         console.error("saveWorld:", e);
     } finally {
         _isSaving = false;
@@ -728,7 +748,7 @@ async function loadWorldDelta(saved) {
         }
 
         flushColors();
-        if (applied > 0) showToast(`↑ Загружено (${applied} изменений)`, "#8cf");
+        if (applied > 0) showToast(t("loaded", applied), "#8cf");
     } catch(e) {
         console.error("loadWorldDelta:", e);
     }
@@ -846,8 +866,8 @@ function fbm(x, y, oct) {
 // ─── ГЕНЕРАЦИЯ МИРА ──────────────────────────────────────────────────────────
 const WATER_LEVEL = 0;
 const LAKE_DEPTH  = 5;
-const DEEP_LIMIT  = -50; // лава ниже этого уровня
-const RAINBOW_START_Y = -10; // радуга начинается с этой глубины
+const DEEP_LIMIT  = -15; // лава ниже этого уровня
+const RAINBOW_START_Y = -5; // радуга начинается с этой глубины
 
 const LAKES = [
     { x:   0, z:   0, r: 12 },
@@ -884,13 +904,16 @@ function coordHash(x, y, z) {
 }
 
 // Тип блока на глубине y (подземный слой)
-function undergroundType(x, y, z) {
+// surfaceY — высота поверхности колонки.
+// 0..4 блоков под поверхностью (y >= surfaceY-5) — камень.
+// Глубже — радуга+камень вплоть до лавы.
+function undergroundType(x, y, z, surfaceY) {
     if (y <= DEEP_LIMIT) return "lava";
-    // y >= -10: верхний слой — всегда сплошной камень, никаких дыр
-    if (y >= RAINBOW_START_Y) return "stone";
-    // y < -10: камень + каждый 15-й случайный радужный
+    // Первые 5 блоков под поверхностью — чистый камень
+    if (y > surfaceY - 6) return "stone";
+    // Ниже — радужные вкрапления
     const h = coordHash(x, y, z);
-    if (h % 15 === 0) return "rainbow";
+    if (h % 10 === 0) return "rainbow";
     return "stone";
 }
 
@@ -913,16 +936,19 @@ function generateChunk(cx, cz) {
 
             if (inLake(x, z)) {
                 const bottom = Math.min(h, WATER_LEVEL - LAKE_DEPTH);
-                for (let y = DEEP_LIMIT; y < bottom; y++) addBlock(x, y, z, undergroundType(x, y, z));
+                // surfaceY для озёрной колонки — высота рельефа h (или bottom если h глубже)
+                const surfaceY = Math.max(h, bottom);
+                for (let y = DEEP_LIMIT; y < bottom; y++) addBlock(x, y, z, undergroundType(x, y, z, surfaceY));
                 addBlock(x, bottom, z, "sand");
-                for (let y = bottom + 1; y <= WATER_LEVEL; y++) addBlock(x, y, z, "water");
+                for (let y = bottom + 1; y < WATER_LEVEL; y++) addBlock(x, y, z, "sand");
+                addBlock(x, WATER_LEVEL, z, "water");
             } else if (inSand(x, z)) {
                 const sy = Math.max(h, WATER_LEVEL + 1);
-                for (let y = DEEP_LIMIT; y < sy; y++) addBlock(x, y, z, undergroundType(x, y, z));
+                for (let y = DEEP_LIMIT; y < sy; y++) addBlock(x, y, z, undergroundType(x, y, z, sy));
                 addBlock(x, sy, z, "sand");
             } else {
                 const top = Math.max(h, WATER_LEVEL + 1);
-                for (let y = DEEP_LIMIT; y < top; y++) addBlock(x, y, z, undergroundType(x, y, z));
+                for (let y = DEEP_LIMIT; y < top; y++) addBlock(x, y, z, undergroundType(x, y, z, top));
                 const surfaceType = top >= 18 ? "stone" : "grass";
                 addBlock(x, top, z, surfaceType);
                 if (surfaceType === "grass" && rng() < 0.035) {
@@ -938,10 +964,10 @@ function generateChunk(cx, cz) {
     }
 }
 
-// undergroundType теперь учитывает абсолютную глубину:
-// y >= -10 (верхние 10 блоков под поверхностью) — всегда камень, без дыр
-// y < -10  — камень + каждый 15-й радужный
-// y <= DEEP_LIMIT — лава
+// undergroundType учитывает глубину от поверхности:
+// first 5 blocks under surface — всегда камень
+// глубже 5 блоков — камень + каждый 10-й радужный
+// y <= DEEP_LIMIT (-15) — лава
 
 function unloadChunk(cx, cz) {
     const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
@@ -2125,11 +2151,77 @@ function animate(now) {
 
 // ─── СТАРТ ───────────────────────────────────────────────────────────────────
 
-const splashEl   = document.getElementById("splash");
-const splashMenu = document.getElementById("splash-menu");
-const btnNewGame = document.getElementById("btn-new-game");
-const btnLoadGame= document.getElementById("btn-load-game");
-const menuHint   = document.getElementById("menu-hint");
+const splashEl    = document.getElementById("splash");
+const splashMenu  = document.getElementById("splash-menu");
+const btnNewGame  = document.getElementById("btn-new-game");
+const btnLoadGame = document.getElementById("btn-load-game");
+const menuHint    = document.getElementById("menu-hint");
+const langSelect  = document.getElementById("lang-select");
+
+// ─── ПЕРЕВОДЫ ────────────────────────────────────────────────────────────────
+const I18N = {
+    ru: {
+        newGame:    "🌍 НОВАЯ ИГРА",
+        loadGame:   "💾 ЗАГРУЗИТЬ",
+        checking:   "проверяем сохранение…",
+        hasSave:    "найдено сохранение",
+        noSave:     "сохранений нет",
+        saved:      (n) => `✓ Сохранено (${n} изменений)`,
+        saveErr:    "✗ Ошибка сохранения",
+        loaded:     (n) => `↑ Загружено (${n} изменений)`,
+        saveTip:    "💾",
+    },
+    en: {
+        newGame:    "🌍 NEW GAME",
+        loadGame:   "💾 LOAD GAME",
+        checking:   "checking save…",
+        hasSave:    "save found",
+        noSave:     "no saves found",
+        saved:      (n) => `✓ Saved (${n} changes)`,
+        saveErr:    "✗ Save error",
+        loaded:     (n) => `↑ Loaded (${n} changes)`,
+        saveTip:    "💾",
+    },
+    de: {
+        newGame:    "🌍 NEUES SPIEL",
+        loadGame:   "💾 LADEN",
+        checking:   "Speicherstand prüfen…",
+        hasSave:    "Speicherstand gefunden",
+        noSave:     "kein Speicherstand",
+        saved:      (n) => `✓ Gespeichert (${n} Änderungen)`,
+        saveErr:    "✗ Speicherfehler",
+        loaded:     (n) => `↑ Geladen (${n} Änderungen)`,
+        saveTip:    "💾",
+    },
+};
+
+// Текущий язык — загружаем из localStorage, fallback на русский
+let currentLang = localStorage.getItem("mishaCraft_lang") || "en";
+
+function t(key, ...args) {
+    const val = I18N[currentLang]?.[key] ?? I18N["ru"][key];
+    return typeof val === "function" ? val(...args) : val;
+}
+
+function applyLang() {
+    btnNewGame.textContent  = t("newGame");
+    btnLoadGame.textContent = t("loadGame");
+    saveBtn.title = t("saveTip");
+    // hint обновляем только если уже показывает статус сохранения
+    if (menuHint.dataset.state === "hasSave") menuHint.textContent = t("hasSave");
+    else if (menuHint.dataset.state === "noSave") menuHint.textContent = t("noSave");
+    else menuHint.textContent = t("checking");
+}
+
+// Устанавливаем сохранённый язык в дропдаун и применяем
+langSelect.value = currentLang;
+applyLang();
+
+langSelect.addEventListener("change", () => {
+    currentLang = langSelect.value;
+    localStorage.setItem("mishaCraft_lang", currentLang);
+    applyLang();
+});
 
 function hideSplash() {
     splashEl.style.transition = "opacity 0.4s";
@@ -2155,7 +2247,6 @@ async function startGame(loadSave) {
 }
 
 async function onReady() {
-    // Анимация логотипа играет ~2с — показываем меню после неё
     const pieceOrder = ["pr","po","py","pg","pb"];
     let delay = 0.1;
     pieceOrder.forEach(id => {
@@ -2166,10 +2257,9 @@ async function onReady() {
         });
         delay += 0.15;
     });
-    // Показываем меню сразу, не ждём анимации логотипа
+
     splashMenu.classList.add("visible");
 
-    // Параллельно проверяем наличие сохранения
     let hasSave = false;
     try {
         const saved = await dbGet("delta");
@@ -2178,9 +2268,11 @@ async function onReady() {
 
     if (hasSave) {
         btnLoadGame.disabled = false;
-        menuHint.textContent = "найдено сохранение";
+        menuHint.dataset.state = "hasSave";
+        menuHint.textContent = t("hasSave");
     } else {
-        menuHint.textContent = "сохранений нет";
+        menuHint.dataset.state = "noSave";
+        menuHint.textContent = t("noSave");
     }
 
     btnNewGame.addEventListener("click",  () => startGame(false));
