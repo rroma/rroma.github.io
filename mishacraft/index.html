@@ -51,6 +51,24 @@ body { margin: 0; overflow: hidden; background: #000; }
 .menu-btn.load-game:hover { background: rgba(80,160,255,0.2); border-color: #5af; }
 .menu-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
 
+.menu-settings {
+    display: flex; flex-direction: column; gap: 10px;
+    width: 240px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 14px 16px;
+}
+.menu-settings label {
+    font-family: 'Courier New', monospace; font-size: 12px;
+    color: rgba(255,255,255,0.6); letter-spacing: 1px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.menu-settings label span {
+    color: #fff; font-size: 13px; font-weight: bold; min-width: 32px; text-align: right;
+}
+.menu-settings input[type=range] {
+    width: 100%; accent-color: #5c8; cursor: pointer;
+    margin-top: 4px;
+}
 #menu-hint {
     font-family: monospace; font-size: 12px;
     color: rgba(255,255,255,0.35);
@@ -129,7 +147,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 
 #underwater {
     position: fixed; inset: 0;
-    background: rgba(0,50,160,0.38); pointer-events: none; display: none;
+    background: rgba(0,80,180,0.18); pointer-events: none; display: none;
 }
 #lava-overlay {
     position: fixed; inset: 0;
@@ -145,6 +163,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 
 @media (pointer: coarse) {
     #mobile-controls { display: block; }
+    #inventory { transform: translateX(-50%) scale(0.8); transform-origin: bottom center; }
 }
 
 /* Джойстик — левый нижний угол */
@@ -216,6 +235,52 @@ body { margin: 0; overflow: hidden; background: #000; }
 #btn-save:hover { background: rgba(60,60,60,0.9); border-color: rgba(255,255,255,0.5); }
 #btn-save:active { background: rgba(0,180,80,0.5); }
 #btn-save.saving { border-color: #0f0; }
+
+#btn-settings {
+    position: fixed; top: 42px; right: 10px; z-index: 30;
+    background: rgba(30,30,30,0.75);
+    border: 1.5px solid rgba(255,255,255,0.25); border-radius: 8px;
+    color: #fff; font-size: 16px; padding: 4px 10px;
+    cursor: pointer; user-select: none; transition: background 0.15s;
+}
+#btn-settings:hover { background: rgba(60,60,60,0.9); }
+
+#settings-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45); z-index: 190;
+}
+#settings-overlay.open { display: block; }
+
+#settings-panel {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    z-index: 200; display: none;
+    background: rgba(12,12,12,0.97);
+    border: 1.5px solid rgba(255,255,255,0.18); border-radius: 14px;
+    padding: 24px 30px; min-width: 300px;
+    font-family: 'Courier New', monospace; color: #fff;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+}
+#settings-panel.open { display: block; }
+#settings-panel h2 {
+    margin: 0 0 20px; font-size: 15px; letter-spacing: 3px;
+    text-align: center; color: rgba(255,255,255,0.75);
+    border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;
+}
+.srow {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.srow label { font-size: 11px; color: rgba(255,255,255,0.55); letter-spacing: 1px; flex: 1; }
+.srow input[type=range] { flex: 1.4; accent-color: #5c8; cursor: pointer; }
+.srow input[type=checkbox] { width: 18px; height: 18px; accent-color: #5c8; cursor: pointer; flex-shrink: 0; }
+.sval { min-width: 28px; text-align: right; font-size: 13px; font-weight: bold; }
+#btn-settings-close {
+    display: block; margin: 8px auto 0; width: 100%;
+    background: rgba(255,255,255,0.07); border: 1.5px solid rgba(255,255,255,0.18);
+    border-radius: 8px; color: #fff; font-family: 'Courier New', monospace;
+    font-size: 13px; padding: 9px; cursor: pointer; letter-spacing: 1px;
+    transition: background 0.15s;
+}
+#btn-settings-close:hover { background: rgba(255,255,255,0.16); }
 
 #save-toast {
     position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
@@ -301,6 +366,7 @@ body { margin: 0; overflow: hidden; background: #000; }
       <option value="en">🇬🇧 English</option>
       <option value="de">🇩🇪 Deutsch</option>
     </select>
+
     <button class="menu-btn new-game"  id="btn-new-game">🌍 НОВАЯ ИГРА</button>
     <button class="menu-btn load-game" id="btn-load-game" disabled>💾 ЗАГРУЗИТЬ</button>
     <div id="menu-hint">проверяем сохранение…</div>
@@ -322,7 +388,23 @@ body { margin: 0; overflow: hidden; background: #000; }
 <div id="loading"></div>
 
 <button id="btn-save" title="Сохранить мир (S)">💾</button>
+<button id="btn-settings" title="Настройки">⚙</button>
 <div id="save-toast"></div>
+
+<div id="settings-overlay"></div>
+<div id="settings-panel">
+  <h2>⚙ НАСТРОЙКИ</h2>
+  <div class="srow">
+    <label>ДАЛЬНОСТЬ</label>
+    <input type="range" id="sp-rd" min="0" max="100" value="38">
+    <span class="sval" id="sp-rd-val">7</span>
+  </div>
+  <div class="srow">
+    <label>🐱 ЖИЗНЬ КОТА<br><span style="font-size:10px;opacity:.5">1 блок высотой</span></label>
+    <input type="checkbox" id="sp-cat">
+  </div>
+  <button id="btn-settings-close">ЗАКРЫТЬ</button>
+</div>
 
 <div id="inventory">
     <div class="slot active" data-type="grass"><canvas id="icon-grass"></canvas></div>
@@ -330,6 +412,7 @@ body { margin: 0; overflow: hidden; background: #000; }
     <div class="slot" data-type="wood"><canvas id="icon-wood"></canvas></div>
     <div class="slot" data-type="leaf"><canvas id="icon-leaf"></canvas></div>
     <div class="slot" data-type="sand"><canvas id="icon-sand"></canvas></div>
+    <div class="slot" data-type="cactus"><canvas id="icon-cactus"></canvas></div>
     <div class="slot" data-type="rainbow"><canvas id="icon-rainbow"></canvas><span class="badge" id="rainbow-badge">0</span></div>
     <div class="slot" data-type="aquarium"><canvas id="icon-aquarium"></canvas></div>
     <div class="slot" data-type="glass"><canvas id="icon-glass"></canvas></div>
@@ -357,34 +440,118 @@ camera.position.set(0, 20, 12);
 camera.rotation.order = "YXZ";
 
 const renderer = new THREE.WebGLRenderer({ antialias: false });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// Retina: cap = 1 вместо 2 — экономит 4× пикселей на Retina-дисплеях
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = false;
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-const sun = new THREE.DirectionalLight(0xfff4cc, 1.2);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambientLight);
+const sun = new THREE.DirectionalLight(0xfff4cc, 1.3);
 sun.position.set(30, 60, 20);
-sun.castShadow = true;
-sun.shadow.mapSize.set(512, 512);
-Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 0.5, far: 200 });
+sun.castShadow = false;
 scene.add(sun);
+
+// ─── ДЕНЬ / НОЧЬ ─────────────────────────────────────────────────────────────
+const DAY_DURATION = 600; // секунд на полный цикл (10 минут)
+let dayTime = 0.28;       // начинаем с утра (0=полночь, 0.5=полдень)
+
+// Заранее выделяем цвета (без GC в каждом кадре)
+const _skyDay   = new THREE.Color(0x87ceeb);
+const _skyDawn  = new THREE.Color(0xff7030);
+const _skyNight = new THREE.Color(0x06101f);
+const _skyColor = new THREE.Color(0x87ceeb); // текущий цвет неба
+
+// Солнце — жёлтый диск
+const _sunMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(10, 16),
+    new THREE.MeshBasicMaterial({ color: 0xfff5aa, fog: false, depthWrite: false })
+);
+_sunMesh.renderOrder = -1;
+scene.add(_sunMesh);
+
+// Луна — серебристый диск
+const _moonMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(6, 16),
+    new THREE.MeshBasicMaterial({ color: 0xdde8ff, fog: false, depthWrite: false })
+);
+_moonMesh.renderOrder = -1;
+scene.add(_moonMesh);
+
+// Звёзды — один Points, 700 точек
+const _STARS = 700;
+const _starBuf = new Float32Array(_STARS * 3);
+for (let i = 0; i < _STARS; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const b = Math.acos(1 - Math.random() * 1.0); // верхнее полушарие
+    const r = 220;
+    _starBuf[i*3]   = r * Math.sin(b) * Math.cos(a);
+    _starBuf[i*3+1] = r * Math.cos(b) + 5;
+    _starBuf[i*3+2] = r * Math.sin(b) * Math.sin(a);
+}
+const _starGeo = new THREE.BufferGeometry();
+_starGeo.setAttribute('position', new THREE.Float32BufferAttribute(_starBuf, 3));
+const _starMat = new THREE.PointsMaterial({
+    color: 0xffffff, size: 1.4,
+    transparent: true, opacity: 0,
+    fog: false, depthWrite: false
+});
+const _starsMesh = new THREE.Points(_starGeo, _starMat);
+_starsMesh.renderOrder = -2;
+scene.add(_starsMesh);
+
+function updateDayNight(dt) {
+    dayTime = (dayTime + dt / DAY_DURATION) % 1;
+
+    // sunAngle: 0.25=восход, 0.5=полдень, 0.75=закат
+    const sunAngle = (dayTime - 0.25) * Math.PI * 2;
+    const sh = Math.sin(sunAngle); // -1..1, высота солнца
+
+    const SKY_R = 230;
+    const cx = camera.position.x, cz = camera.position.z;
+
+    // Солнце
+    _sunMesh.position.set(cx + Math.cos(sunAngle) * SKY_R, sh * SKY_R, cz);
+    _sunMesh.lookAt(camera.position);
+    _sunMesh.visible = sh > -0.12;
+
+    // Луна (противоположная сторона)
+    _moonMesh.position.set(cx - Math.cos(sunAngle) * SKY_R, -sh * SKY_R, cz);
+    _moonMesh.lookAt(camera.position);
+    _moonMesh.visible = sh < 0.12;
+
+    // Звёзды — следуют за камерой, прозрачность нарастает после заката
+    _starsMesh.position.set(cx, 0, cz);
+    _starMat.opacity = Math.max(0, Math.min(1, (-sh - 0.05) * 5));
+
+    // Цвет неба
+    if (sh >= 0) {
+        _skyColor.lerpColors(_skyDawn, _skyDay, Math.min(1, sh * 4));
+    } else {
+        _skyColor.lerpColors(_skyDawn, _skyNight, Math.min(1, -sh * 4));
+    }
+    scene.background.copy(_skyColor);
+
+    // Направленный свет: угол и интенсивность
+    sun.position.set(Math.cos(sunAngle) * 80, sh * 80, 20);
+    const dayF = Math.max(0, sh);
+    sun.intensity = dayF * 1.3;
+    sun.color.setHex(sh > 0.25 ? 0xfff4cc : 0xff9944); // белый днём, оранжевый на рассвете/закате
+
+    // Фоновое освещение: 0.12 ночью → 0.55 днём
+    ambientLight.intensity = 0.12 + dayF * 0.43;
+}
 
 // ─── INSTANCED MESH ──────────────────────────────────────────────────────────
 const BGEO = new THREE.BoxGeometry(1, 1, 1);
-const MAX_INST = 200000; // дефолт
+// Лимиты только для instanced-типов (chunk-mesh типы лимитов не имеют)
+const MAX_INST = 50000;
 const MAX_INST_BY_TYPE = {
-    stone: 20000,
-    grass: 60000,
-    sand:  30000,
-    water: 30000,
-    lava:  20000,
-    wood:  15000,
-    leaf:  20000,
-    rainbow: 10000,
-    aquarium: 5000,
-    glass: 5000,
+    water:     40000,
+    rainbow:   15000,
+    aquarium:   5000,
+    glass:      5000,
 };
 
 // Радуга: одна текстура с 7 горизонтальными полосами на кубе
@@ -406,38 +573,42 @@ function makeRainbowTexture() {
     return tex;
 }
 
-const BLOCK_TYPES  = ["grass","stone","wood","leaf","sand","water","lava","rainbow","aquarium","glass"];
+const BLOCK_TYPES  = ["grass","stone","wood","leaf","sand","water","lava","rainbow","aquarium","glass","cactus","flower"];
 const BLOCK_COLOR  = {
     grass:0x4caf50, stone:0x888888, wood:0x8b5a2b, leaf:0x2e7d32, sand:0xe2c97e,
     water:0x1565c0, lava:0xff4500, rainbow:0xffffff, aquarium:0x88ddff, glass:0xddf4ff,
+    cactus:0x3d8b40, flower:0xFF50A0,
 };
 
+// Типы блоков: chunk-mesh (видимые грани, MeshBasicMaterial+vertexColors)
+//              vs InstancedMesh (спецматериалы: прозрачность, текстура)
+const CHUNK_MESH_TYPES = new Set(["grass","stone","wood","leaf","sand","lava","cactus","flower"]);
+const INSTANCED_TYPES  = new Set(["water","rainbow","aquarium","glass"]);
+
+// ─── INSTANCED MESH (только спецтипы) ────────────────────────────────────────
 const iMesh = {};
-for (const t of BLOCK_TYPES) {
-    const isWater   = t === "water";
-    const isLava    = t === "lava";
-    const isRainbow = t === "rainbow";
+for (const t of INSTANCED_TYPES) {
+    const isWater    = t === "water";
+    const isRainbow  = t === "rainbow";
     const isAquarium = t === "aquarium";
-    const isGlass   = t === "glass";
+    const isGlass    = t === "glass";
     const mat = new THREE.MeshLambertMaterial({
         color: BLOCK_COLOR[t],
         map: isRainbow ? makeRainbowTexture() : null,
         transparent: isWater || isAquarium || isGlass,
-        opacity: isWater ? 0.62 : isAquarium ? 0.35 : isGlass ? 0.28 : 1,
+        opacity: isWater ? 0.38 : isAquarium ? 0.35 : isGlass ? 0.28 : 1,
         depthWrite: !isWater && !isAquarium && !isGlass,
         polygonOffset: isWater || isAquarium || isGlass,
         polygonOffsetFactor: (isWater || isAquarium || isGlass) ? -1 : 0,
         polygonOffsetUnits:  (isWater || isAquarium || isGlass) ? -1 : 0,
-        ...(isLava ? { emissive: new THREE.Color(0xff4500), emissiveIntensity: 0.6 } : {}),
-        ...(isRainbow ? { emissive: new THREE.Color(0x888888), emissiveIntensity: 0.3 } : {}),
+        ...(isRainbow  ? { emissive: new THREE.Color(0x888888), emissiveIntensity: 0.3  } : {}),
         ...(isAquarium ? { emissive: new THREE.Color(0x0088cc), emissiveIntensity: 0.25 } : {}),
-        ...(isGlass ? { emissive: new THREE.Color(0xaaddff), emissiveIntensity: 0.12 } : {}),
+        ...(isGlass    ? { emissive: new THREE.Color(0xaaddff), emissiveIntensity: 0.12 } : {}),
         vertexColors: false,
     });
     const maxInst = MAX_INST_BY_TYPE[t] || MAX_INST;
     const im = new THREE.InstancedMesh(BGEO, mat, maxInst);
-    im.castShadow    = !isWater && !isRainbow && !isAquarium && !isGlass;
-    im.receiveShadow = !isWater && !isAquarium && !isGlass;
+    im.castShadow = false; im.receiveShadow = false;
     im.count = 0;
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(maxInst * 3).fill(1), 3);
@@ -445,6 +616,345 @@ for (const t of BLOCK_TYPES) {
     im.frustumCulled = false;
     scene.add(im);
     iMesh[t] = im;
+}
+
+// ─── CHUNK MESH SYSTEM ───────────────────────────────────────────────────────
+// Один MeshBasicMaterial с vertexColors — яркость бекается в цвет вершин.
+// ─── ТЕКСТУРНЫЙ АТЛАС ────────────────────────────────────────────────────────
+// Процедурно генерируем 64×64 атлас (4×4 тайла по 16×16) в стиле пиксель-арт.
+const ATLAS_TILE = 16, ATLAS_COLS = 4;
+
+let _blockAtlasCanvas = null;
+
+function makeBlockAtlas() {
+    const W = ATLAS_TILE * ATLAS_COLS;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = W;
+    _blockAtlasCanvas = canvas;
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(W, W);
+    const px  = img.data;
+
+    function setpx(x, y, r, g, b, a = 255) {
+        const i = (y * W + x) * 4;
+        px[i] = r; px[i+1] = g; px[i+2] = b; px[i+3] = a;
+    }
+    // Детерминированный шум через sin-хэш
+    function noise(x, y, seed) {
+        return Math.abs(Math.sin(x * 127.1 + y * 311.7 + seed * 74.3) * 43758.5) % 1;
+    }
+    function noiseTile(col, row, R, G, B, dR, dG, dB, chance, seed = 0) {
+        const tx = col * ATLAS_TILE, ty = row * ATLAS_TILE;
+        for (let y = 0; y < ATLAS_TILE; y++)
+            for (let x = 0; x < ATLAS_TILE; x++) {
+                const d = noise(x, y, seed + col + row * 4) < chance;
+                setpx(tx+x, ty+y, d?dR:R, d?dG:G, d?dB:B);
+            }
+    }
+
+    // ── Ряд 0 ──────────────────────────────────────────────────────────────────
+    // [0,0] grass_top
+    noiseTile(0,0, 90,158,56,  84,151,50,  0.18, 1);
+    // [1,0] grass_side: зелёная полоска (3px) + земля
+    { const tx=1*ATLAS_TILE, ty=0*ATLAS_TILE;
+      for (let y=0;y<ATLAS_TILE;y++) for (let x=0;x<ATLAS_TILE;x++) {
+          if (y<3) { const d=noise(x,y,2)<0.18; setpx(tx+x,ty+y,d?85:90,d?152:158,d?52:56); }
+          else     { const d=noise(x,y-3,3)<0.13; setpx(tx+x,ty+y,d?134:139,d?95:99,d?63:67); }
+      }
+    }
+    // [2,0] dirt
+    noiseTile(2,0, 139,99,67,  134,95,63,  0.13, 4);
+    // [3,0] stone
+    noiseTile(3,0, 136,136,136, 130,130,130, 0.10, 5);
+
+    // ── Ряд 1 ──────────────────────────────────────────────────────────────────
+    // [0,1] sand
+    noiseTile(0,1, 225,200,124, 219,195,119, 0.15, 6);
+    // [1,1] wood_side — вертикальные волокна
+    { const tx=1*ATLAS_TILE, ty=1*ATLAS_TILE;
+      for (let y=0;y<ATLAS_TILE;y++) for (let x=0;x<ATLAS_TILE;x++) {
+          const stripe = Math.abs(Math.sin(x*0.9 + Math.sin(y*0.25)*1.5)) < 0.28;
+          setpx(tx+x,ty+y, stripe?114:120, stripe?83:88, stripe?39:42);
+      }
+    }
+    // [2,1] wood_top — кольца
+    { const tx=2*ATLAS_TILE, ty=1*ATLAS_TILE;
+      for (let y=0;y<ATLAS_TILE;y++) for (let x=0;x<ATLAS_TILE;x++) {
+          const d=Math.sqrt((x-7.5)**2+(y-7.5)**2);
+          const ring=Math.sin(d*1.4)>0.15;
+          setpx(tx+x,ty+y, ring?114:120, ring?83:88, ring?39:42);
+      }
+    }
+    // [3,1] leaf
+    noiseTile(3,1, 56,120,28,  52,114,24,  0.20, 8);
+
+    // ── Ряд 2 ──────────────────────────────────────────────────────────────────
+    // [0,2] lava
+    noiseTile(0,2, 255,100,0,  242,86,0,  0.25, 9);
+    // [1,2] cactus — зелёный с вертикальными рёбрами (varying by x = вертикальные полосы)
+    { const tx=1*ATLAS_TILE, ty=2*ATLAS_TILE;
+      for (let y=0;y<ATLAS_TILE;y++) for (let x=0;x<ATLAS_TILE;x++) {
+          const rib = (x % 5 < 1);  // чёткие вертикальные рёбра каждые 5px
+          setpx(tx+x,ty+y, rib?38:61, rib?100:139, rib?32:56);
+      }
+    }
+    // [2,2] flower — розовые лепестки вокруг жёлтого центра
+    { const tx=2*ATLAS_TILE, ty=2*ATLAS_TILE;
+      for (let y=0;y<ATLAS_TILE;y++) for (let x=0;x<ATLAS_TILE;x++) {
+          const cx=x-7.5, cy=y-7.5;
+          const d = Math.sqrt(cx*cx+cy*cy);
+          const petal = d < 6.0 && (Math.abs(cx)<2.0 || Math.abs(cy)<2.0 ||
+                        (Math.abs(Math.abs(cx)-Math.abs(cy))<1.8 && d<5.0));
+          if (d < 2.0)      setpx(tx+x,ty+y,255,220,0);    // жёлтый центр
+          else if (petal)   setpx(tx+x,ty+y,255,80,160);    // розовые лепестки
+          else              setpx(tx+x,ty+y,48,120,40);     // зелёный фон
+      }
+    }
+
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; // пиксельный стиль, без размытия
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false; // UV.v=0 → верх канваса, иначе атлас читается вверх ногами
+    return tex;
+}
+
+// Какой тайл [col,row] для каждого типа блока и грани (top/side/bottom)
+const BLOCK_TILES = {
+    grass:  { top:[0,0], side:[1,0], bottom:[2,0] },
+    stone:  { top:[3,0], side:[3,0], bottom:[3,0] },
+    sand:   { top:[0,1], side:[0,1], bottom:[0,1] },
+    wood:   { top:[2,1], side:[1,1], bottom:[2,1] },
+    leaf:   { top:[3,1], side:[3,1], bottom:[3,1] },
+    lava:   { top:[0,2], side:[0,2], bottom:[0,2] },
+    cactus: { top:[1,2], side:[1,2], bottom:[1,2] },
+    flower: { top:[2,2], side:[2,2], bottom:[2,2] },
+};
+
+// UV внутри тайла [0,1]² → UV в атласе
+function tileUV(col, row, u, v) {
+    const inv = 1 / ATLAS_COLS;
+    return [(col + u) * inv, (row + v) * inv];
+}
+// UV для вершины грани fi по её локальным координатам [vx,vy,vz] ∈ [-0.5,0.5]
+function faceVertUV(fi, vx, vy, vz) {
+    switch (fi) {
+        case 0: return [vx+0.5, vz+0.5];     // top: XZ-плоскость
+        case 1: return [vx+0.5, 0.5-vz];     // bottom
+        case 2: return [0.5-vz, 0.5-vy];     // +X
+        case 3: return [vz+0.5, 0.5-vy];     // -X
+        case 4: return [vx+0.5, 0.5-vy];     // +Z
+        default:return [0.5-vx, 0.5-vy];     // -Z
+    }
+}
+
+// Один меш на чанк вместо одного InstancedMesh на тип → только видимые грани.
+const _blockAtlas = makeBlockAtlas();
+const chunkMatOpaque = new THREE.MeshLambertMaterial({
+    map: _blockAtlas,
+    vertexColors: true, // vertex color = grayscale brightness (depth + torch)
+    color: 0xffffff,
+});
+const chunkMeshes    = new Map(); // chunkKey → THREE.Mesh
+const dirtyChunks    = new Set(); // чанки требующие перестройки
+
+// BLOCK_COLOR_RGB нужен только для instanced-типов (water/glass/etc)
+const BLOCK_COLOR_RGB = {};
+for (const [t, hex] of Object.entries(BLOCK_COLOR)) {
+    const c = new THREE.Color(hex);
+    BLOCK_COLOR_RGB[t] = { r: c.r, g: c.g, b: c.b };
+}
+
+// FACE_*_MULT не нужны — Lambert + текстура делают всё
+const FACE_TOP_MULT  = 1;
+const FACE_SIDE_MULT = 1;
+const FACE_BOT_MULT  = 1;
+
+// 6 граней куба: [нормаль], 4 вершины (CCW порядок = лицевая сторона снаружи), множитель яркости.
+// Проверка CCW: normal = (v1-v0) × (v2-v0) должен совпадать с n.
+const CUBE_FACES = [
+    // top (+Y): normal = (0,0,1)×(1,0,1) = (0,1,0) ✓
+    { n:[0, 1,0], v:[[-0.5,0.5,-0.5],[-0.5,0.5,0.5],[0.5,0.5,0.5],[0.5,0.5,-0.5]], m: FACE_TOP_MULT  },
+    // bottom (-Y): normal = (0,0,1)×(-1,0,1) = (0,-1,0) ✓
+    { n:[0,-1,0], v:[[ 0.5,-0.5,-0.5],[0.5,-0.5,0.5],[-0.5,-0.5,0.5],[-0.5,-0.5,-0.5]], m: FACE_BOT_MULT  },
+    // +X: normal = (0,1,0)×(0,1,1) = (1,0,0) ✓
+    { n:[1, 0,0], v:[[0.5,-0.5,-0.5],[0.5,0.5,-0.5],[0.5,0.5,0.5],[0.5,-0.5, 0.5]], m: FACE_SIDE_MULT },
+    // -X: normal = (0,1,0)×(0,1,-1) = (-1,0,0) ✓
+    { n:[-1,0,0], v:[[-0.5,-0.5,0.5],[-0.5,0.5,0.5],[-0.5,0.5,-0.5],[-0.5,-0.5,-0.5]], m: FACE_SIDE_MULT },
+    // +Z: normal = (1,0,0)×(1,1,0) = (0,0,1) ✓
+    { n:[0, 0,1], v:[[-0.5,-0.5,0.5],[0.5,-0.5,0.5],[0.5,0.5,0.5],[-0.5,0.5, 0.5]], m: FACE_SIDE_MULT },
+    // -Z: normal = (-1,0,0)×(-1,1,0) = (0,0,-1) ✓
+    { n:[0, 0,-1], v:[[0.5,-0.5,-0.5],[-0.5,-0.5,-0.5],[-0.5,0.5,-0.5],[0.5,0.5,-0.5]], m: FACE_SIDE_MULT },
+];
+
+function _isOpaqueNeighbor(type) {
+    // Листья, кактусы и цветы не блокируют соседние грани
+    return type && CHUNK_MESH_TYPES.has(type) && type !== "leaf" && type !== "cactus" && type !== "flower";
+}
+
+// Кактус — тонкий параллелепипед (w=0.4)
+const CW = 0.35; // half-width
+const CACTUS_FACES = [
+    { n:[0, 1,0], v:[[-CW,0.5,-CW],[-CW,0.5,CW],[CW,0.5,CW],[CW,0.5,-CW]], ux:0 }, // top
+    { n:[1, 0,0], v:[[ CW,-0.5,-CW],[CW,0.5,-CW],[CW,0.5,CW],[CW,-0.5,CW]], ux:1 }, // +X
+    { n:[-1,0,0], v:[[-CW,-0.5,CW],[-CW,0.5,CW],[-CW,0.5,-CW],[-CW,-0.5,-CW]], ux:1 }, // -X
+    { n:[0, 0,1], v:[[-CW,-0.5,CW],[CW,-0.5,CW],[CW,0.5,CW],[-CW,0.5,CW]], ux:2 }, // +Z
+    { n:[0, 0,-1],v:[[CW,-0.5,-CW],[-CW,-0.5,-CW],[-CW,0.5,-CW],[CW,0.5,-CW]], ux:2 }, // -Z
+];
+
+// Цветок — маленький X-крест (±0.3 в XZ, ±0.35 по Y), двусторонний
+const FW = 0.3, FH = 0.35;
+const FLOWER_FACES = [
+    // Плоскость Z=0, лицевая (n=+Z)
+    { v:[[-FW,-FH,0],[FW,-FH,0],[FW,FH,0],[-FW,FH,0]], n:[0,0,1] },
+    // Плоскость Z=0, тыльная (n=-Z)
+    { v:[[FW,-FH,0],[-FW,-FH,0],[-FW,FH,0],[FW,FH,0]], n:[0,0,-1] },
+    // Плоскость X=0, лицевая (n=+X)
+    { v:[[0,-FH,FW],[0,FH,FW],[0,FH,-FW],[0,-FH,-FW]], n:[1,0,0] },
+    // Плоскость X=0, тыльная (n=-X)
+    { v:[[0,-FH,-FW],[0,FH,-FW],[0,FH,FW],[0,-FH,FW]], n:[-1,0,0] },
+];
+
+function buildChunkMesh(cx, cz) {
+    const key = chunkKey(cx, cz);
+    // Убираем старый меш
+    if (chunkMeshes.has(key)) {
+        const old = chunkMeshes.get(key);
+        scene.remove(old);
+        old.geometry.dispose();
+    }
+
+    const positions = [], colors = [], normals = [], uvs = [], indices = [];
+    const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
+
+    for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
+        for (let z = z0; z < z0 + CHUNK_SIZE; z++) {
+            for (let y = DEEP_LIMIT; y <= 50; y++) {
+                const k = bkey(x, y, z);
+                const entry = blockMap.get(k);
+                if (!entry || !CHUNK_MESH_TYPES.has(entry.type)) continue;
+
+                const br = blockBrightness(x, y, z);
+                const baseBr = entry.type === "lava" ? Math.min(1.0, br * 1.6) : br;
+                const tiles = BLOCK_TILES[entry.type];
+
+                // Цветок — X-крест, сдвигаем к кактусу вплотную
+                if (entry.type === "flower") {
+                    const tile = BLOCK_TILES.flower.side;
+                    // Ищем соседний кактус и сдвигаем спрайт к нему на 0.5
+                    let ox = 0, oz = 0;
+                    for (const [ndx, ndz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                        const nb = blockMap.get(bkey(x + ndx, y, z + ndz));
+                        if (nb?.type === "cactus") { ox = ndx * 0.5; oz = ndz * 0.5; break; }
+                    }
+                    for (const face of FLOWER_FACES) {
+                        const [nx, ny, nz] = face.n;
+                        const base = positions.length / 3;
+                        for (const [vx, vy, vz] of face.v) {
+                            positions.push(x + ox + vx, y + vy, z + oz + vz);
+                            colors.push(baseBr, baseBr, baseBr);
+                            normals.push(nx, ny, nz);
+                            const tu = nx !== 0 ? (vz / FW * 0.5 + 0.5) : (vx / FW * 0.5 + 0.5);
+                            const tv = vy / FH * 0.5 + 0.5;
+                            const [au, av] = tileUV(tile[0], tile[1], tu, tv);
+                            uvs.push(au, av);
+                        }
+                        indices.push(base, base+1, base+2, base, base+2, base+3);
+                    }
+                    continue;
+                }
+
+                // Кактус — тонкий столб, отдельный рендеринг
+                if (entry.type === "cactus") {
+                    const tile = tiles.side;
+                    for (let fi = 0; fi < CACTUS_FACES.length; fi++) {
+                        const face = CACTUS_FACES[fi];
+                        const [nx, ny, nz] = face.n;
+                        const base = positions.length / 3;
+                        for (const [vx, vy, vz] of face.v) {
+                            positions.push(x + vx, y + vy, z + vz);
+                            colors.push(baseBr, baseBr, baseBr);
+                            normals.push(nx, ny, nz);
+                            // UV: top — XZ, боковые — по горизонтали/вертикали грани
+                            let tu, tv;
+                            if (fi === 0) { tu = vx/CW*0.5+0.5; tv = vz/CW*0.5+0.5; }       // top
+                            else if (face.ux === 1) { tu = vz/CW*0.5+0.5; tv = 0.5 - vy; }  // X-грани
+                            else                    { tu = vx/CW*0.5+0.5; tv = 0.5 - vy; }  // Z-грани
+                            const [au, av] = tileUV(tile[0], tile[1], tu, tv);
+                            uvs.push(au, av);
+                        }
+                        indices.push(base, base+1, base+2, base, base+2, base+3);
+                    }
+                    continue;
+                }
+
+                for (let fi = 0; fi < CUBE_FACES.length; fi++) {
+                    const face = CUBE_FACES[fi];
+                    const [nx, ny, nz] = face.n;
+                    const nb = blockMap.get(bkey(x + nx, y + ny, z + nz));
+                    if (_isOpaqueNeighbor(nb?.type)) continue;
+
+                    // Выбираем тайл: top / side / bottom
+                    const tile = fi === 0 ? tiles.top : fi === 1 ? tiles.bottom : tiles.side;
+
+                    const base = positions.length / 3;
+                    for (const [vx, vy, vz] of face.v) {
+                        positions.push(x + vx, y + vy, z + vz);
+                        // Vertex color = grayscale brightness; текстура даёт цвет
+                        colors.push(baseBr, baseBr, baseBr);
+                        normals.push(nx, ny, nz);
+                        const [tu, tv] = faceVertUV(fi, vx, vy, vz);
+                        const [au, av] = tileUV(tile[0], tile[1], tu, tv);
+                        uvs.push(au, av);
+                    }
+                    indices.push(base, base+1, base+2, base, base+2, base+3);
+                }
+            }
+        }
+    }
+
+    if (indices.length === 0) { chunkMeshes.delete(key); return; }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute("color",    new THREE.Float32BufferAttribute(colors,    3));
+    geo.setAttribute("normal",   new THREE.Float32BufferAttribute(normals,   3));
+    geo.setAttribute("uv",       new THREE.Float32BufferAttribute(uvs,       2));
+    geo.setIndex(indices);
+    const mesh = new THREE.Mesh(geo, chunkMatOpaque);
+    mesh.frustumCulled = true; // Three.js сам отсекает невидимые чанки!
+    scene.add(mesh);
+    chunkMeshes.set(key, mesh);
+}
+
+function markChunkDirty(x, z) {
+    const cx = Math.floor(Math.round(x) / CHUNK_SIZE);
+    const cz = Math.floor(Math.round(z) / CHUNK_SIZE);
+    dirtyChunks.add(chunkKey(cx, cz));
+    // Блок у границы чанка — дirtим соседей тоже
+    const lx = ((Math.round(x) % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const lz = ((Math.round(z) % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    if (lx === 0)              dirtyChunks.add(chunkKey(cx - 1, cz));
+    if (lx === CHUNK_SIZE - 1) dirtyChunks.add(chunkKey(cx + 1, cz));
+    if (lz === 0)              dirtyChunks.add(chunkKey(cx, cz - 1));
+    if (lz === CHUNK_SIZE - 1) dirtyChunks.add(chunkKey(cx, cz + 1));
+}
+
+// Бюджет на всю работу с чанками за один кадр (мс)
+const CHUNK_FRAME_BUDGET_MS = 5;
+let _frameStartMs = 0; // устанавливается в начале animate()
+
+function flushDirtyChunks() {
+    if (!dirtyChunks.size) return;
+    for (const key of dirtyChunks) {
+        // Останавливаемся, если израсходовали бюджет кадра
+        if (performance.now() - _frameStartMs > CHUNK_FRAME_BUDGET_MS) break;
+        dirtyChunks.delete(key);
+        if (!loadedChunks.has(key)) continue;
+        const [cx, cz] = key.split(",").map(Number);
+        buildChunkMesh(cx, cz);
+    }
 }
 
 // ─── ОСВЕЩЕНИЕ ПО ГЛУБИНЕ ────────────────────────────────────────────────────
@@ -504,13 +1014,17 @@ function hasSkyAbove(x, y, z) {
 
 function blockBrightness(x, y, z) {
     const entry = blockMap.get(bkey(x, y, z));
-    if (entry && (entry.type === "lava" || entry.type === "rainbow")) return 1.0;
+    if (!entry) return 1.0;
+    // Вода и аквариум — единая яркость, иначе на границах блоков видна сетка
+    if (entry.type === "water" || entry.type === "aquarium") return 0.88;
+    if (entry.type === "lava" || entry.type === "rainbow") return 1.0;
     const base = depthBrightness(y);
     const sky  = hasSkyAbove(x, y, z) ? SKY_BONUS : 0;
     return Math.min(1.0, base + sky);
 }
 
-// Подсветка от "факела" игрока — обновляем блоки вокруг каждые N кадров
+// Факел только для instanced-типов (water/aquarium/glass/rainbow).
+// Для chunk-mesh типов яркость запекается в геометрию при buildChunkMesh.
 let torchFrame = 0;
 function updateTorchLight(px, py, pz) {
     torchFrame++;
@@ -522,7 +1036,8 @@ function updateTorchLight(px, py, pz) {
         for (let y = ipy - r; y <= ipy + r; y++) {
             for (let z = ipz - r; z <= ipz + r; z++) {
                 const entry = blockMap.get(bkey(x, y, z));
-                if (!entry) continue;
+                if (!entry || !INSTANCED_TYPES.has(entry.type)) continue;
+                if (entry.type === "water" || entry.type === "aquarium") continue;
                 const dx = x - px, dy = y - py, dz = z - pz;
                 const dist2 = dx*dx + dy*dy + dz*dz;
                 if (dist2 > r*r) continue;
@@ -539,31 +1054,45 @@ function updateTorchLight(px, py, pz) {
     for (const t of dirty) iMesh[t].instanceColor.needsUpdate = true;
 }
 
-// Применить яркость к инстансу (без GPU flush — вызывай flushColors после батча)
+// Применить яркость к instanced-инстансу (без GPU flush)
 const _brightColor = new THREE.Color();
 function applyBrightness(type, idx, x, y, z) {
+    if (!INSTANCED_TYPES.has(type)) return;
     const br = blockBrightness(x, y, z);
     _brightColor.setRGB(br, br, br);
     iMesh[type].setColorAt(idx, _brightColor);
 }
 
-// Сбросить флаги GPU для всех мешей у которых менялись цвета
+// Сбросить флаги GPU для instanced-мешей
 const _colorDirtyTypes = new Set();
-function markColorDirty(type) { _colorDirtyTypes.add(type); }
+function markColorDirty(type) { if (INSTANCED_TYPES.has(type)) _colorDirtyTypes.add(type); }
 function flushColors() {
     for (const t of _colorDirtyTypes) iMesh[t].instanceColor.needsUpdate = true;
     _colorDirtyTypes.clear();
 }
 
-// Пересчитать skylight и цвета блоков в радиусе вокруг точки
-// (вызывается при ломании/постановке блока)
+// Пересчитать skylight: для instanced → обновить instanceColor;
+// для chunk-mesh → пометить чанк dirty (яркость перезапечётся при rebuild).
 function refreshLightAround(cx, cy, cz, radius) {
     const ix = Math.round(cx), iy = Math.round(cy), iz = Math.round(cz);
+    // Chunk-mesh: дirtим затронутые чанки
+    const chunkDirty = new Set();
+    for (let x = ix - radius - 1; x <= ix + radius + 1; x++) {
+        for (let z = iz - radius - 1; z <= iz + radius + 1; z++) {
+            const ck = chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE));
+            if (loadedChunks.has(ck)) chunkDirty.add(ck);
+        }
+    }
+    for (const ck of chunkDirty) {
+        const [ccx, ccz] = ck.split(",").map(Number);
+        dirtyChunks.add(ck);
+    }
+    // Instanced: обновляем instanceColor
     for (let x = ix - radius; x <= ix + radius; x++) {
         for (let y = iy - radius; y <= iy + radius + SKY_CHECK_H; y++) {
             for (let z = iz - radius; z <= iz + radius; z++) {
                 const entry = blockMap.get(bkey(x, y, z));
-                if (!entry) continue;
+                if (!entry || !INSTANCED_TYPES.has(entry.type)) continue;
                 applyBrightness(entry.type, entry.idx, x, y, z);
                 markColorDirty(entry.type);
             }
@@ -579,7 +1108,7 @@ const blockMap = new Map();
 const waterSet = new Set();
 const lavaSet  = new Set();
 const freeList = {};
-for (const t of BLOCK_TYPES) freeList[t] = [];
+for (const t of INSTANCED_TYPES) freeList[t] = [];
 // solidEntries removed — DDA не нуждается в списке солидных блоков
 
 // ─── СИСТЕМА СОХРАНЕНИЯ ──────────────────────────────────────────────────────
@@ -596,6 +1125,69 @@ let   worldGenDone = false;      // true после загрузки старт�
 let _isSaving = false;
 const saveBtn   = document.getElementById("btn-save");
 const saveToast = document.getElementById("save-toast");
+
+// ─── НАСТРОЙКИ ───────────────────────────────────────────────────────────────
+let catLife = localStorage.getItem("mishaCraft_catLife") === "1";
+
+function applyCatLife() {
+    PLAYER_H = catLife ? 1.0 : 1.75;
+    // Мыши только в режиме кота
+    for (const m of mouseGroup) { m.visible = catLife; }
+    // Свиньи только без кота
+    for (const p of pigGroup)  { if (catLife) p.visible = false; }
+}
+// applyCatLife() вызывается в startGame() — после создания всех сущностей
+
+const btnSettings      = document.getElementById("btn-settings");
+const settingsPanel    = document.getElementById("settings-panel");
+const settingsOverlay  = document.getElementById("settings-overlay");
+const btnSettingsClose = document.getElementById("btn-settings-close");
+const spRd             = document.getElementById("sp-rd");
+const spRdVal          = document.getElementById("sp-rd-val");
+const spCat            = document.getElementById("sp-cat");
+
+// Восстанавливаем значения
+const _spRDsaved = localStorage.getItem("mishaCraft_renderDist");
+if (_spRDsaved !== null) spRd.value = _spRDsaved;
+spRdVal.textContent = sliderToChunks(+spRd.value);
+spCat.checked = catLife;
+
+spRd.addEventListener("input", () => {
+    const chunks = sliderToChunks(+spRd.value);
+    spRdVal.textContent = chunks;
+    RENDER_DIST = chunks;
+    localStorage.setItem("mishaCraft_renderDist", spRd.value);
+    // Синхронизируем слайдер в меню
+});
+
+spCat.addEventListener("change", () => {
+    catLife = spCat.checked;
+    localStorage.setItem("mishaCraft_catLife", catLife ? "1" : "0");
+    applyCatLife();
+});
+
+function openSettings() {
+    settingsPanel.classList.add("open");
+    settingsOverlay.classList.add("open");
+    spRdVal.textContent = sliderToChunks(+spRd.value);
+}
+function closeSettings() {
+    settingsPanel.classList.remove("open");
+    settingsOverlay.classList.remove("open");
+}
+
+btnSettings.addEventListener("click", openSettings);
+btnSettingsClose.addEventListener("click", closeSettings);
+settingsOverlay.addEventListener("click", closeSettings);
+
+// Escape: если нет pointer lock — открыть/закрыть настройки
+document.addEventListener("keydown", e => {
+    if (e.code === "Escape") {
+        if (!document.pointerLockElement) {
+            settingsPanel.classList.contains("open") ? closeSettings() : openSettings();
+        }
+    }
+});
 
 function showToast(msg, color = "#0f0", ms = 2000) {
     saveToast.textContent = msg;
@@ -741,13 +1333,18 @@ async function loadWorldDelta(saved) {
         for (const b of delta.placed) {
             const k = bkey(b.x, b.y, b.z);
             const existing = blockMap.get(k);
-            if (existing) removeBlock(existing);
+            if (existing) {
+                if (existing.type === "aquarium") removeAquariumFish(existing.x, existing.y, existing.z);
+                removeBlock(existing);
+            }
             addBlock(b.x, b.y, b.z, b.type);
+            if (!addBlock._lastFail && b.type === "aquarium") spawnAquariumFish(b.x, b.y, b.z);
             userPlaced.set(k, { x: b.x, y: b.y, z: b.z, type: b.type });
             applied++;
         }
 
         flushColors();
+        flushDirtyChunks();
         if (applied > 0) showToast(t("loaded", applied), "#8cf");
     } catch(e) {
         console.error("loadWorldDelta:", e);
@@ -758,10 +1355,35 @@ let selected = "grass";
 
 function bkey(x, y, z) { return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`; }
 
+// Батчинг: во время generateChunk откладываем buildChunkMesh на конец.
+// Для instanced-типов откладываем needsUpdate аналогично.
+let _batchingBlocks = false;
+const _matrixDirtyTypes = new Set();
+function flushMatrices() {
+    for (const t of _matrixDirtyTypes) iMesh[t].instanceMatrix.needsUpdate = true;
+    _matrixDirtyTypes.clear();
+}
+
 function addBlock(x, y, z, type) {
     type = type || "grass";
     const k = bkey(x, y, z);
     if (blockMap.has(k)) { addBlock._lastFail = `occupied`; return; }
+    addBlock._lastFail = null;
+
+    const rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+
+    if (CHUNK_MESH_TYPES.has(type)) {
+        // Chunk-mesh тип: только blockMap, меш строим через dirty-систему
+        const entry = { x: rx, y: ry, z: rz, type, idx: -1 };
+        blockMap.set(k, entry);
+        if (type === "lava") lavaSet.add(k);
+        skyColumnAdd(rx, ry, rz);
+        if (!worldGenDone) worldGenKeys.add(k);
+        if (!_batchingBlocks) markChunkDirty(rx, rz);
+        return;
+    }
+
+    // Instanced тип
     const im = iMesh[type];
     if (!im) { addBlock._lastFail = `no_mesh`; return; }
     const limit = MAX_INST_BY_TYPE[type] || MAX_INST;
@@ -772,18 +1394,15 @@ function addBlock(x, y, z, type) {
         if (im.count >= limit) { addBlock._lastFail = `limit_${im.count}/${limit}`; return; }
         idx = im.count++;
     }
-    addBlock._lastFail = null;
-    const rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
     _dummy.position.set(rx, ry, rz);
     _dummy.scale.set(1, 1, 1);
     _dummy.updateMatrix();
     im.setMatrixAt(idx, _dummy.matrix);
-    im.instanceMatrix.needsUpdate = true;
+    if (_batchingBlocks) _matrixDirtyTypes.add(type);
+    else im.instanceMatrix.needsUpdate = true;
     const entry = { x: rx, y: ry, z: rz, type, idx };
     blockMap.set(k, entry);
     if (type === "water") waterSet.add(k);
-    else if (type === "lava") lavaSet.add(k);
-    // (solidEntries removed)
 
     // Яркость по глубине + skylight
     applyBrightness(type, idx, rx, ry, rz);
@@ -798,14 +1417,27 @@ function removeBlock(entry) {
     const k = bkey(entry.x, entry.y, entry.z);
     const data = blockMap.get(k);
     if (!data) return;
+
+    if (CHUNK_MESH_TYPES.has(data.type)) {
+        blockMap.delete(k);
+        lavaSet.delete(k);
+        skyColumnRemove(data.x, data.y, data.z);
+        markChunkDirty(data.x, data.z);
+        // Соседние чанки тоже могут открыть новые грани
+        for (const [nx, , nz] of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]]) {
+            markChunkDirty(data.x + nx, data.z + nz);
+        }
+        refreshLightAround(data.x, data.y, data.z, 1);
+        return;
+    }
+
+    // Instanced тип
     iMesh[data.type].setMatrixAt(data.idx, _zero);
     iMesh[data.type].instanceMatrix.needsUpdate = true;
     freeList[data.type].push(data.idx);
     blockMap.delete(k);
     waterSet.delete(k);
     lavaSet.delete(k);
-
-    // Пробитое отверстие открывает небо снизу — обновляем колонку и свет
     skyColumnRemove(data.x, data.y, data.z);
     refreshLightAround(data.x, data.y, data.z, 1);
 }
@@ -870,12 +1502,24 @@ const DEEP_LIMIT  = -15; // лава ниже этого уровня
 const RAINBOW_START_Y = -5; // радуга начинается с этой глубины
 
 const LAKES = [
-    { x:   0, z:   0, r: 12 },
-    { x:  80, z:  40, r: 16 },
-    { x: -70, z:  60, r: 10 },
-    { x:  30, z: -90, r: 14 },
-    { x: -60, z: -50, r: 18 },
+    { x:   0, z:   0, r: 14 },
+    { x:  80, z:  40, r: 18 },
+    { x: -70, z:  60, r: 12 },
+    { x:  30, z: -90, r: 16 },
+    { x: -60, z: -50, r: 20 },
 ];
+
+// Одна большая Redwood-зона на карте (низкочастотный шум → одно крупное пятно)
+function isTropical(x, z) {
+    const patch = fbm(x * 0.005 + 150, z * 0.005 + 150, 2);
+    return patch > 0.30;
+}
+
+// Пустыня ~20-25% карты, отдельная зона (другое смещение шума)
+function isDesert(x, z) {
+    const patch = fbm(x * 0.006 - 300, z * 0.006 + 250, 2);
+    return patch > 0.26 && !isTropical(x, z);
+}
 
 function terrainHeight(x, z) {
     const mountains = fbm(x * 0.008 + 5,  z * 0.008 + 5,  6) * 28;
@@ -898,29 +1542,17 @@ function inSand(x, z) { return lakeVal(x, z) < 4 && !inLake(x, z); }
 
 // Псевдослучайный хэш по координатам — стабильный между кадрами
 function coordHash(x, y, z) {
-    let h = Math.round(x) * 374761393 + Math.round(y) * 1234567891 + Math.round(z) * 987654321;
-    h = ((h ^ (h >> 13)) * 1540483477) & 0x7fffffff;
-    return h;
-}
-
-// Тип блока на глубине y (подземный слой)
-// surfaceY — высота поверхности колонки.
-// 0..4 блоков под поверхностью (y >= surfaceY-5) — камень.
-// Глубже — радуга+камень вплоть до лавы.
-function undergroundType(x, y, z, surfaceY) {
-    if (y <= DEEP_LIMIT) return "lava";
-    // Первые 5 блоков под поверхностью — чистый камень
-    if (y > surfaceY - 6) return "stone";
-    // Ниже — радужные вкрапления
-    const h = coordHash(x, y, z);
-    if (h % 10 === 0) return "rainbow";
-    return "stone";
+    // Работаем только в 32-битном unsigned int через побитовые операции
+    let h = (Math.imul(x | 0, 1664525) + Math.imul(y | 0, 22695477) + Math.imul(z | 0, 6364136)) >>> 0;
+    h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
+    h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
+    return h ^ (h >>> 16);
 }
 
 // ─── ЧАНКИ ───────────────────────────────────────────────────────────────────
 const CHUNK_SIZE  = 10;
-const RENDER_DIST = 4;
-const WORLD_LIMIT = 30;
+let RENDER_DIST = 7;
+const WORLD_LIMIT = 150;
 
 const loadedChunks = new Map();
 let buildQueue = [];
@@ -928,48 +1560,152 @@ let buildQueue = [];
 function chunkKey(cx, cz) { return `${cx},${cz}`; }
 
 function generateChunk(cx, cz) {
+    _batchingBlocks = true;
     const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
+    // Кэшируем terrainHeight для всех колонок чанка (каждая вызывает 3 fbm)
+    const hCache = new Float32Array(CHUNK_SIZE * CHUNK_SIZE);
+    for (let dx = 0; dx < CHUNK_SIZE; dx++)
+        for (let dz = 0; dz < CHUNK_SIZE; dz++)
+            hCache[dx * CHUNK_SIZE + dz] = terrainHeight(x0 + dx, z0 + dz);
+
     for (let dx = 0; dx < CHUNK_SIZE; dx++) {
         for (let dz = 0; dz < CHUNK_SIZE; dz++) {
             const x = x0 + dx, z = z0 + dz;
-            const h = terrainHeight(x, z);
+            const h = hCache[dx * CHUNK_SIZE + dz];
 
+            // ── Единый подземный слой для всех колонок ───────────────────────
+            // y = -15: один слой лавы
+            addBlock(x, DEEP_LIMIT, z, "lava");
+            // y = -14 … -6: пусто; случайно 1/15 — радужный блок
+            for (let y = DEEP_LIMIT + 1; y <= -6; y++) {
+                if (coordHash(x, y, z) % 15 === 0) addBlock(x, y, z, "rainbow");
+            }
+
+            // ── Наземный слой ────────────────────────────────────────────────
             if (inLake(x, z)) {
-                const bottom = Math.min(h, WATER_LEVEL - LAKE_DEPTH);
-                // surfaceY для озёрной колонки — высота рельефа h (или bottom если h глубже)
-                const surfaceY = Math.max(h, bottom);
-                for (let y = DEEP_LIMIT; y < bottom; y++) addBlock(x, y, z, undergroundType(x, y, z, surfaceY));
-                addBlock(x, bottom, z, "sand");
-                for (let y = bottom + 1; y < WATER_LEVEL; y++) addBlock(x, y, z, "sand");
-                addBlock(x, WATER_LEVEL, z, "water");
+                // y = -5: песок (дно озера, закрывает пещеру)
+                // y = -4 … 0: вода (5 блоков)
+                addBlock(x, -5, z, "sand");
+                for (let y = -4; y <= WATER_LEVEL; y++) addBlock(x, y, z, "water");
+                for (let y = WATER_LEVEL + 1; y <= h; y++) {
+                    if (y === h) addBlock(x, y, z, h >= 18 ? "stone" : "grass");
+                    else addBlock(x, y, z, "sand");
+                }
             } else if (inSand(x, z)) {
                 const sy = Math.max(h, WATER_LEVEL + 1);
-                for (let y = DEEP_LIMIT; y < sy; y++) addBlock(x, y, z, undergroundType(x, y, z, sy));
+                for (let y = -5; y < sy; y++) addBlock(x, y, z, "stone");
                 addBlock(x, sy, z, "sand");
             } else {
                 const top = Math.max(h, WATER_LEVEL + 1);
-                for (let y = DEEP_LIMIT; y < top; y++) addBlock(x, y, z, undergroundType(x, y, z, top));
+                for (let y = -5; y < top; y++) addBlock(x, y, z, "stone");
                 const surfaceType = top >= 18 ? "stone" : "grass";
                 addBlock(x, top, z, surfaceType);
-                if (surfaceType === "grass" && rng() < 0.035) {
-                    const th = 3 + (rng() < 0.3 ? 1 : 0);
-                    for (let y = 1; y <= th; y++) addBlock(x, top + y, z, "wood");
-                    for (let lx = -1; lx <= 1; lx++)
-                        for (let lz = -1; lz <= 1; lz++)
-                            addBlock(x + lx, top + th + 1, z + lz, "leaf");
-                    addBlock(x, top + th + 2, z, "leaf");
+                // Пустыня: заменяем поверхность песком и добавляем кактусы
+                if (surfaceType === "grass" && isDesert(x, z)) {
+                    // Убираем верхний блок травы, ставим песок
+                    blockMap.delete(`${x},${top},${z}`);
+                    addBlock(x, top, z, "sand");
+                    // Под поверхностью ещё 1-2 блока песка
+                    addBlock(x, top - 1, z, "sand");
+                    if (rng() < 0.5) addBlock(x, top - 2, z, "sand");
+                    // Кактус: 1.5% шанс, высота 3-5 блоков + ответвления
+                    if (rng() < 0.015) {
+                        const ch = 3 + Math.floor(rng() * 3);
+                        for (let cy = 1; cy <= ch; cy++) addBlock(x, top + cy, z, "cactus");
+                        // Маленькие цветы сбоку ствола (1-2 штуки на случайных высотах)
+                        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+                        const numFlowers = 1 + (rng() < 0.55 ? 1 : 0);
+                        for (let f = 0; f < numFlowers; f++) {
+                            const fy = 1 + Math.floor(rng() * ch);
+                            const [fd, fz2] = dirs[Math.floor(rng() * 4)];
+                            addBlock(x + fd, top + fy, z + fz2, "flower");
+                        }
+                        // Ответвления: 1-2 руки на случайной высоте
+                        const arms = 1 + (rng() < 0.5 ? 1 : 0);
+                        for (let a = 0; a < arms; a++) {
+                            const armH = 1 + Math.floor(rng() * (ch - 2)); // высота ответвления
+                            const [dx, dz] = dirs[Math.floor(rng() * 4)];
+                            const armLen = 1 + (rng() < 0.4 ? 1 : 0); // 1-2 блока в сторону
+                            for (let d = 1; d <= armLen; d++)
+                                addBlock(x + dx*d, top + armH, z + dz*d, "cactus");
+                            // Вверх с конца ответвления
+                            const upH = 1 + Math.floor(rng() * 2);
+                            for (let cy = 1; cy <= upH; cy++)
+                                addBlock(x + dx*armLen, top + armH + cy, z + dz*armLen, "cactus");
+                        }
+                    }
+                }
+
+                const tropical = isTropical(x, z);
+                const treeChance = tropical ? 0.0055 : 0.022;
+                if (surfaceType === "grass" && !isDesert(x, z) && rng() < treeChance) {
+                    if (tropical) {
+                        // ── Высокое дерево с ярусами как у пальмы ──────────
+                        const th = 17 + (rng() < 0.5 ? 2 : 0) + (rng() < 0.3 ? 2 : 0);
+                        // Голый ствол
+                        for (let y = 1; y <= th; y++) addBlock(x, top + y, z, "wood");
+                        // Рандомизированные ярусы
+                        const numTiers   = 3 + (rng() < 0.5 ? 1 : 0) + (rng() < 0.3 ? 1 : 0); // 3-5
+                        const tierStep   = 2 + Math.floor(rng() * 2); // шаг 2-3 блока
+                        const armLen     = 4 + (rng() < 0.5 ? 1 : 0); // длина ветки 4-5
+                        const hasDiag    = rng() < 0.6; // диагональные ветки не всегда
+                        for (let t = 0; t < numTiers; t++) {
+                            const ty = th - t * tierStep;
+                            if (ty < 3) break;
+                            addBlock(x, top + ty, z, "leaf");
+                            for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                                for (let d = 1; d <= armLen; d++) {
+                                    const drop = d <= 2 ? 0 : d <= 4 ? -1 : -2;
+                                    addBlock(x+dx*d, top+ty+drop, z+dz*d, "leaf");
+                                }
+                            }
+                            if (hasDiag) {
+                                const diagLen = armLen - 1;
+                                for (const [dx, dz] of [[1,1],[-1,1],[1,-1],[-1,-1]]) {
+                                    for (let d = 1; d <= diagLen; d++) {
+                                        const drop = d <= 1 ? 0 : d <= 3 ? -1 : -2;
+                                        addBlock(x+dx*d, top+ty+drop, z+dz*d, "leaf");
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // ── Обычное дерево ─────────────────────────────────
+                        const th = 3 + (rng() < 0.3 ? 1 : 0);
+                        for (let y = 1; y <= th; y++) addBlock(x, top + y, z, "wood");
+                        // Нижний слой кроны — широкий (r=2)
+                        for (let lx = -2; lx <= 2; lx++)
+                            for (let lz = -2; lz <= 2; lz++)
+                                if (Math.abs(lx) + Math.abs(lz) <= 3)
+                                    addBlock(x + lx, top + th + 1, z + lz, "leaf");
+                        // Верхний слой — 3×3
+                        for (let lx = -1; lx <= 1; lx++)
+                            for (let lz = -1; lz <= 1; lz++)
+                                addBlock(x + lx, top + th + 2, z + lz, "leaf");
+                    }
                 }
             }
         }
     }
+    _batchingBlocks = false;
+    flushMatrices();
+    // Меш строим через dirtyChunks — не блокируем текущий кадр
+    // markChunkDirty внутри addBlock уже отмечает соседние чанки
+    // для граничных блоков, поэтому лишний проход по 8 соседям не нужен.
+    dirtyChunks.add(chunkKey(cx, cz));
 }
 
-// undergroundType учитывает глубину от поверхности:
-// first 5 blocks under surface — всегда камень
-// глубже 5 блоков — камень + каждый 10-й радужный
-// y <= DEEP_LIMIT (-15) — лава
-
 function unloadChunk(cx, cz) {
+    const key = chunkKey(cx, cz);
+    // Убираем chunk-mesh
+    if (chunkMeshes.has(key)) {
+        const old = chunkMeshes.get(key);
+        scene.remove(old);
+        old.geometry.dispose();
+        chunkMeshes.delete(key);
+    }
+    dirtyChunks.delete(key);
+
     const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
     for (let dx = 0; dx < CHUNK_SIZE; dx++) {
         for (let dz = 0; dz < CHUNK_SIZE; dz++) {
@@ -977,15 +1713,19 @@ function unloadChunk(cx, cz) {
                 const k = bkey(x0 + dx, y, z0 + dz);
                 const entry = blockMap.get(k);
                 if (!entry) continue;
-                iMesh[entry.type].setMatrixAt(entry.idx, _zero);
-                iMesh[entry.type].instanceMatrix.needsUpdate = true;
-                freeList[entry.type].push(entry.idx);
+                if (INSTANCED_TYPES.has(entry.type)) {
+                    iMesh[entry.type].setMatrixAt(entry.idx, _zero);
+                    iMesh[entry.type].instanceMatrix.needsUpdate = true;
+                    freeList[entry.type].push(entry.idx);
+                }
                 blockMap.delete(k);
                 waterSet.delete(k);
                 lavaSet.delete(k);
             }
         }
     }
+    // Соседних чанков не дirtим при выгрузке — игрок всё равно смотрит вперёд,
+    // а граничные грани невидимы со стороны выгруженного чанка.
 }
 
 function scheduleChunks(px, pz) {
@@ -1014,6 +1754,8 @@ function scheduleChunks(px, pz) {
 const loadingEl = document.getElementById("loading");
 function processBuildQueue() {
     if (!buildQueue.length) { loadingEl.textContent = ""; return; }
+    // Пропускаем генерацию, если бюджет кадра уже исчерпан
+    if (performance.now() - _frameStartMs >= CHUNK_FRAME_BUDGET_MS) return;
     const { cx, cz, k } = buildQueue.shift();
     if (!loadedChunks.has(k)) { generateChunk(cx, cz); loadedChunks.set(k, true); flushColors(); }
     loadingEl.textContent = buildQueue.length > 0 ? `Загрузка: ${buildQueue.length} чанков` : "";
@@ -1108,62 +1850,109 @@ function updateAquariumFish(simTime) {
     }
 }
 
-const PIG_FOOT_OFFSET = 0.645; // низ модели от центра группы
-
 // ─── СВИНЬИ ──────────────────────────────────────────────────────────────────
+const PIG_FOOT_OFFSET = 0.645;
 const pigGroup = [];
-const PIG_BODY = new THREE.BoxGeometry(0.9, 0.6, 0.5);
-const PIG_HEAD = new THREE.BoxGeometry(0.45, 0.45, 0.45);
-const PIG_LEG  = new THREE.BoxGeometry(0.18, 0.35, 0.18);
-const PIG_MAT  = new THREE.MeshLambertMaterial({ color: 0xffb6c1 });
+const PIG_BODY    = new THREE.BoxGeometry(0.9, 0.6, 0.5);
+const PIG_HEAD    = new THREE.BoxGeometry(0.45, 0.45, 0.45);
+const PIG_LEG     = new THREE.BoxGeometry(0.18, 0.35, 0.18);
+const PIG_MAT     = new THREE.MeshLambertMaterial({ color: 0xffb6c1 });
 const PIG_SNOUT_MAT = new THREE.MeshLambertMaterial({ color: 0xff8fa0 });
 const PIG_SNOUT_GEO = new THREE.BoxGeometry(0.22, 0.18, 0.12);
 
-for (let i = 0; i < 20; i++) {
+const PIG_COUNT   = 5;
+const MOUSE_COUNT = 10;
+
+for (let i = 0; i < PIG_COUNT; i++) {
     const pig = new THREE.Group();
-
-    const body = new THREE.Mesh(PIG_BODY, PIG_MAT);
-    pig.add(body);
-
+    pig.add(new THREE.Mesh(PIG_BODY, PIG_MAT));
     const head = new THREE.Mesh(PIG_HEAD, PIG_MAT);
-    head.position.set(0, 0.15, -0.55);
-    pig.add(head);
-
+    head.position.set(0, 0.15, -0.55); pig.add(head);
     const snout = new THREE.Mesh(PIG_SNOUT_GEO, PIG_SNOUT_MAT);
-    snout.position.set(0, 0.12, -0.78);
-    pig.add(snout);
-
-    const legPositions = [[-0.3, -0.47, -0.14],[0.3, -0.47, -0.14],[-0.3, -0.47, 0.14],[0.3, -0.47, 0.14]];
-    for (const [lx, ly, lz] of legPositions) {
+    snout.position.set(0, 0.12, -0.78); pig.add(snout);
+    for (const [lx, ly, lz] of [[-0.3,-0.47,-0.14],[0.3,-0.47,-0.14],[-0.3,-0.47,0.14],[0.3,-0.47,0.14]]) {
         const leg = new THREE.Mesh(PIG_LEG, PIG_MAT);
-        leg.position.set(lx, ly, lz);
-        pig.add(leg);
+        leg.position.set(lx, ly, lz); pig.add(leg);
+    }
+    let px, pz;
+    do { px = (Math.random()-0.5)*100; pz = (Math.random()-0.5)*100; }
+    while (inLake(px, pz) || inSand(px, pz));
+    const surfY = Math.max(terrainHeight(px, pz), WATER_LEVEL + 1);
+    pig.userData = { px, pz, py: (surfY+0.5)+PIG_FOOT_OFFSET, velY:0, onGround:true,
+        dir: Math.random()*Math.PI*2, speed: 0.018+Math.random()*0.008,
+        turnTimer: Math.random()*120, wobble: Math.random()*100, legPhase: 0 };
+    scene.add(pig);
+    pigGroup.push(pig);
+}
+
+// ─── МЫШИ ────────────────────────────────────────────────────────────────────
+const MOUSE_FOOT_OFFSET = 0.19;
+const mouseGroup = [];
+
+const MOUSE_BODY_GEO  = new THREE.BoxGeometry(0.38, 0.16, 0.22);
+const MOUSE_HEAD_GEO  = new THREE.BoxGeometry(0.20, 0.19, 0.21);
+const MOUSE_EAR_GEO   = new THREE.BoxGeometry(0.09, 0.11, 0.04);
+const MOUSE_LEG_GEO   = new THREE.BoxGeometry(0.06, 0.11, 0.06);
+const MOUSE_TAIL_GEO  = new THREE.BoxGeometry(0.03, 0.03, 0.28);
+const MOUSE_MAT       = new THREE.MeshLambertMaterial({ color: 0x999999 });
+const MOUSE_EAR_MAT   = new THREE.MeshLambertMaterial({ color: 0xcc8888 });
+const MOUSE_NOSE_GEO  = new THREE.BoxGeometry(0.06, 0.05, 0.05);
+const MOUSE_NOSE_MAT  = new THREE.MeshLambertMaterial({ color: 0xff7799 });
+
+for (let i = 0; i < MOUSE_COUNT; i++) {
+    const mouse = new THREE.Group();
+
+    const body = new THREE.Mesh(MOUSE_BODY_GEO, MOUSE_MAT);
+    mouse.add(body);
+
+    const head = new THREE.Mesh(MOUSE_HEAD_GEO, MOUSE_MAT);
+    head.position.set(0, 0.04, -0.28);
+    mouse.add(head);
+
+    // Уши
+    for (const ex of [-0.07, 0.07]) {
+        const ear = new THREE.Mesh(MOUSE_EAR_GEO, MOUSE_EAR_MAT);
+        ear.position.set(ex, 0.16, -0.26);
+        mouse.add(ear);
     }
 
-    // Случайная стартовая позиция вне озёр
+    // Нос
+    const nose = new THREE.Mesh(MOUSE_NOSE_GEO, MOUSE_NOSE_MAT);
+    nose.position.set(0, 0.02, -0.40);
+    mouse.add(nose);
+
+    // Лапки
+    for (const [lx, lz] of [[-0.14,-0.07],[0.14,-0.07],[-0.14,0.07],[0.14,0.07]]) {
+        const leg = new THREE.Mesh(MOUSE_LEG_GEO, MOUSE_MAT);
+        leg.position.set(lx, -0.13, lz);
+        mouse.add(leg);
+    }
+
+    // Хвост
+    const tail = new THREE.Mesh(MOUSE_TAIL_GEO, MOUSE_MAT);
+    tail.position.set(0, 0.0, 0.25);
+    mouse.add(tail);
+
     let px, pz;
     do {
         px = (Math.random() - 0.5) * 100;
         pz = (Math.random() - 0.5) * 100;
     } while (inLake(px, pz) || inSand(px, pz));
 
-    // Ставим свинью точно на поверхность через terrainHeight
     const surfY = Math.max(terrainHeight(px, pz), WATER_LEVEL + 1);
-    const py = (surfY + 0.5) + PIG_FOOT_OFFSET; // +1 = верх блока, +offset = низ ног
+    const py = (surfY + 0.5) + MOUSE_FOOT_OFFSET;
 
-    pig.userData = {
-        px, pz,
-        py,
-        velY: 0,
-        onGround: true,
+    mouse.userData = {
+        px, pz, py,
+        velY: 0, onGround: true,
         dir: Math.random() * Math.PI * 2,
-        speed: 0.04 + Math.random() * 0.02,
+        speed: 0.012 + Math.random() * 0.006,
         turnTimer: Math.random() * 120,
         wobble: Math.random() * 100,
         legPhase: 0,
     };
-    scene.add(pig);
-    pigGroup.push(pig);
+    scene.add(mouse);
+    mouseGroup.push(mouse);
 }
 
 // ─── ОБЛАКА ──────────────────────────────────────────────────────────────────
@@ -1184,9 +1973,9 @@ for (let i = 0; i < 18; i++) {
 }
 
 // ─── ПОДСВЕТКА ───────────────────────────────────────────────────────────────
-const highlight = new THREE.Mesh(
-    new THREE.BoxGeometry(1.06, 1.06, 1.06),
-    new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true })
+const highlight = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.06, 1.06, 1.06)),
+    new THREE.LineBasicMaterial({ color: 0xffff00 })
 );
 scene.add(highlight);
 highlight.visible = false;
@@ -1273,7 +2062,7 @@ function smoothDt(raw) {
 
 // ─── ФИЗИКА ──────────────────────────────────────────────────────────────────
 const FIXED_DT   = 1 / 60;
-const PLAYER_H   = 1.75;
+let PLAYER_H   = catLife ? 1.0 : 1.75; // catLife определён раньше
 const PLAYER_R   = 0.28;
 const GRAVITY    = 0.018;
 const JUMP_FORCE = 0.30;
@@ -1373,8 +2162,8 @@ function physicsTick() {
     // Абсолютное дно — ниже лавы не падаем
     if (pos.y < DEEP_LIMIT + PLAYER_H) { pos.y = DEEP_LIMIT + PLAYER_H; velY = 0; }
 
-    scheduleChunks(pos.x, pos.z);
 }
+// scheduleChunks вызывается из animate, не из physicsTick — убираем отсюда
 
 // ─── LOD — единый подход для всех сущностей ──────────────────────────────────
 // Три уровня по дистанции от игрока:
@@ -1398,62 +2187,91 @@ function entityLOD(ex, ez) {
     return "far";
 }
 
-// ─── ФИЗИКА СВИНЕЙ ───────────────────────────────────────────────────────────
-// Низ модели = -0.645 от центра (ноги: y=-0.47, h=0.35 → низ = -0.645)
-// pig.position.y = (surfaceBlock + 0.5) + PIG_FOOT_OFFSET
-
-function updatePigs(simTime) {
-    for (const pig of pigGroup) {
-        const d = pig.userData;
+// ─── ФИЗИКА МЫШЕЙ ────────────────────────────────────────────────────────────
+function updateMice(simTime) {
+    for (const mouse of mouseGroup) {
+        const d = mouse.userData;
         const lod = entityLOD(d.px, d.pz);
 
-        // FAR — скрываем, ничего не считаем
-        if (lod === "far") { pig.visible = false; continue; }
-        pig.visible = true;
+        if (lod === "far") { mouse.visible = false; continue; }
+        mouse.visible = true;
 
-        // MID — двигаем только каждые 4 кадра, анимацию замораживаем
         const skipUpdate = lod === "mid" && (simTime * 60 | 0) % 4 !== 0;
         if (!skipUpdate) {
             d.turnTimer--;
             if (d.turnTimer <= 0) {
-                d.dir += (Math.random() - 0.5) * Math.PI * 0.8;
-                d.turnTimer = 60 + Math.random() * 180;
+                d.dir += (Math.random() - 0.5) * Math.PI * 1.2;
+                d.turnTimer = 40 + Math.random() * 120;
             }
 
-            const spd = d.speed;
-            const nx = d.px + Math.sin(d.dir) * spd;
-            const nz = d.pz + Math.cos(d.dir) * spd;
+            const nx = d.px + Math.sin(d.dir) * d.speed;
+            const nz = d.pz + Math.cos(d.dir) * d.speed;
             if (!inLake(nx, nz)) { d.px = nx; d.pz = nz; }
             else d.dir += Math.PI * 0.5;
 
             if (!d.onGround) d.velY -= GRAVITY;
             d.py += d.velY;
 
-            const pigFeetY = d.py - PIG_FOOT_OFFSET;
-            const pigBy = Math.floor(pigFeetY - 0.05);
-            const pigOnGround = isSolid(Math.round(d.px), pigBy, Math.round(d.pz));
-            if (pigOnGround && d.velY <= 0) {
-                d.py = (pigBy + 0.5) + PIG_FOOT_OFFSET;
+            const feetY = d.py - MOUSE_FOOT_OFFSET;
+            const by = Math.floor(feetY - 0.05);
+            if (isSolid(Math.round(d.px), by, Math.round(d.pz)) && d.velY <= 0) {
+                d.py = (by + 0.5) + MOUSE_FOOT_OFFSET;
                 d.velY = 0; d.onGround = true;
             } else {
                 d.onGround = false;
-                const expectedSurf = Math.max(terrainHeight(d.px, d.pz), WATER_LEVEL + 1);
-                const expectedPy   = (expectedSurf + 0.5) + PIG_FOOT_OFFSET;
+                const surf = Math.max(terrainHeight(d.px, d.pz), WATER_LEVEL + 1);
+                const expectedPy = (surf + 0.5) + MOUSE_FOOT_OFFSET;
                 if (d.py < expectedPy) { d.py = expectedPy; d.velY = 0; d.onGround = true; }
             }
 
+            mouse.position.set(d.px, d.py, d.pz);
+            mouse.rotation.y = -d.dir;
+        }
+
+        // Анимация лапок — только NEAR (дети 5-8 = лапки)
+        if (lod === "near") {
+            d.legPhase += d.speed * 6;
+            const swing = Math.sin(d.legPhase) * 0.4;
+            for (let li = 5; li <= 8; li++) {
+                if (mouse.children[li]) mouse.children[li].rotation.x = (li % 2 === 0 ? swing : -swing);
+            }
+        }
+    }
+}
+
+function updatePigs(simTime) {
+    for (const pig of pigGroup) {
+        const d = pig.userData;
+        const lod = entityLOD(d.px, d.pz);
+        if (lod === "far") { pig.visible = false; continue; }
+        pig.visible = true;
+        const skipUpdate = lod === "mid" && (simTime * 60 | 0) % 4 !== 0;
+        if (!skipUpdate) {
+            d.turnTimer--;
+            if (d.turnTimer <= 0) { d.dir += (Math.random()-0.5)*Math.PI*0.8; d.turnTimer = 60+Math.random()*180; }
+            const nx = d.px + Math.sin(d.dir)*d.speed, nz = d.pz + Math.cos(d.dir)*d.speed;
+            if (!inLake(nx, nz)) { d.px = nx; d.pz = nz; } else d.dir += Math.PI*0.5;
+            if (!d.onGround) d.velY -= GRAVITY;
+            d.py += d.velY;
+            const pigFeetY = d.py - PIG_FOOT_OFFSET;
+            const pigBy = Math.floor(pigFeetY - 0.05);
+            if (isSolid(Math.round(d.px), pigBy, Math.round(d.pz)) && d.velY <= 0) {
+                d.py = (pigBy+0.5)+PIG_FOOT_OFFSET; d.velY = 0; d.onGround = true;
+            } else {
+                d.onGround = false;
+                const exp = (Math.max(terrainHeight(d.px,d.pz),WATER_LEVEL+1)+0.5)+PIG_FOOT_OFFSET;
+                if (d.py < exp) { d.py = exp; d.velY = 0; d.onGround = true; }
+            }
             pig.position.set(d.px, d.py, d.pz);
             pig.rotation.y = -d.dir;
         }
-
-        // Анимация ног — только NEAR
         if (lod === "near") {
             d.legPhase += d.speed * 4;
-            const swing = Math.sin(d.legPhase) * 0.3;
-            pig.children[3].rotation.x =  swing;
-            pig.children[4].rotation.x = -swing;
-            pig.children[5].rotation.x = -swing;
-            pig.children[6].rotation.x =  swing;
+            const sw = Math.sin(d.legPhase) * 0.3;
+            pig.children[3].rotation.x =  sw;
+            pig.children[4].rotation.x = -sw;
+            pig.children[5].rotation.x = -sw;
+            pig.children[6].rotation.x =  sw;
         }
     }
 }
@@ -1480,7 +2298,25 @@ function getHit() {
     return castRay(_rayOrig, _rayDir, 6);
 }
 
+const _entityRaycaster = new THREE.Raycaster();
+
 function doBreak() {
+    // Проверяем попадание по мыши (только в режиме кота)
+    if (catLife && mouseGroup.length > 0) {
+        _entityRaycaster.set(interpPos, _rayDir);
+        const hits = _entityRaycaster.intersectObjects(mouseGroup, true);
+        if (hits.length > 0 && hits[0].distance < 5) {
+            // Находим корневой Group (parent мешей мыши)
+            let obj = hits[0].object;
+            while (obj.parent && !(obj.parent instanceof THREE.Scene)) obj = obj.parent;
+            const idx = mouseGroup.indexOf(obj);
+            if (idx >= 0) {
+                scene.remove(obj);
+                mouseGroup.splice(idx, 1);
+            }
+            return;
+        }
+    }
     const hit = getHit();
     if (!hit) return;
     const broken = hit.entry;
@@ -1541,16 +2377,18 @@ document.addEventListener("contextmenu", e => e.preventDefault());
 // Рисуем изометрическую проекцию куба с тремя гранями разной яркости.
 // Каждый блок имеет свои цвета граней (top / left / right).
 const ICON_DEF = {
-    grass:   { top: "#6abf5e", left: "#3d8b3d", right: "#2e6b2e", label: "🌿" },
-    stone:   { top: "#aaaaaa", left: "#707070", right: "#555555", label: "🪨" },
-    wood:    { top: "#c8874a", left: "#7a4520", right: "#5c3218", label: "🪵" },
-    leaf:    { top: "#4caf50", left: "#2e7d32", right: "#1b5e20", label: "🍃" },
-    sand:    { top: "#f0d98a", left: "#c8a84b", right: "#a07830", label: "🏖" },
+    grass:   { top: "#5a9e38", left: "#7a5535", right: "#5e3f26", label: "🌿" },
+    stone:   { top: "#888888", left: "#606060", right: "#484848", label: "🪨" },
+    wood:    { top: "#8b5a2b", left: "#6d4520", right: "#4e3018", label: "🪵" },
+    leaf:    { top: "#2e7d32", left: "#1b5e20", right: "#124016", label: "🍃" },
+    sand:    { top: "#e2c97e", left: "#c8a84b", right: "#a07830", label: "🏖" },
     rainbow: { top: null,      left: null,      right: null,      label: "🌈" },
     lava:    { top: "#ff7043", left: "#bf360c", right: "#8b1a00", label: "🔥" },
     water:   { top: "#42a5f5", left: "#1565c0", right: "#0d47a1", label: "💧" },
     aquarium:{ top: "#aaeeff", left: "#55bbdd", right: "#2299bb", label: "🐠" },
     glass:   { top: "#e8f8ff", left: "#b0ddf0", right: "#80bedd", label: "🪟" },
+    cactus:  { top: "#3d8b40", left: "#2e6b32", right: "#1f4a22", label: "🌵" },
+    flower:  { top: "#FF50A0", left: "#E03080", right: "#C01060", label: "🌸" },
 };
 
 function drawBlockIcon(canvas, type) {
@@ -1579,6 +2417,11 @@ function drawBlockIcon(canvas, type) {
         return;
     }
 
+    if (type === "cactus") {
+        drawCactusIcon(ctx, S);
+        return;
+    }
+
     // Изометрический куб: проекция top / left-front / right-front
     // Размер грани в проекции
     const W = S * 0.72, H = W * 0.5; // ширина и высота top-ромба
@@ -1599,27 +2442,53 @@ function drawBlockIcon(canvas, type) {
     // тонкая обводка
     ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 0.8; ctx.stroke();
 
-    // Left face (параллелограмм)
-    ctx.beginPath();
-    ctx.moveTo(cx - W/2, topY + H/2);
-    ctx.lineTo(cx,       topY + H);
-    ctx.lineTo(cx,       topY + H + FH);
-    ctx.lineTo(cx - W/2, topY + H/2 + FH);
-    ctx.closePath();
-    ctx.fillStyle = def.left;
-    ctx.fill();
-    ctx.stroke();
+    // Вспомогательная функция: рисует параллелограмм с необязательной зелёной полоской сверху
+    function drawSideFace(p1, p2, p3, p4, baseColor, stripColor) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(...p1); ctx.lineTo(...p2);
+        ctx.lineTo(...p3); ctx.lineTo(...p4);
+        ctx.closePath();
+        ctx.fillStyle = baseColor;
+        ctx.fill();
+        if (stripColor) {
+            // Зелёная полоска — верхние ~15% грани (интерполяция между верхними и нижними точками)
+            const t = 0.15;
+            const s1 = p1, s2 = p2;
+            const s3 = [p2[0]*(1-t)+p3[0]*t, p2[1]*(1-t)+p3[1]*t];
+            const s4 = [p1[0]*(1-t)+p4[0]*t, p1[1]*(1-t)+p4[1]*t];
+            ctx.beginPath();
+            ctx.moveTo(...s1); ctx.lineTo(...s2);
+            ctx.lineTo(...s3); ctx.lineTo(...s4);
+            ctx.closePath();
+            ctx.fillStyle = stripColor;
+            ctx.fill();
+        }
+        ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(...p1); ctx.lineTo(...p2);
+        ctx.lineTo(...p3); ctx.lineTo(...p4);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+    }
 
+    const strip = type === "grass" ? "#5a9e38" : null;
+    const leftDirt  = type === "grass" ? "#7a5535" : def.left;
+    const rightDirt = type === "grass" ? "#5e3f26" : def.right;
+
+    // Left face
+    drawSideFace(
+        [cx - W/2, topY + H/2], [cx, topY + H],
+        [cx, topY + H + FH],    [cx - W/2, topY + H/2 + FH],
+        leftDirt, strip
+    );
     // Right face
-    ctx.beginPath();
-    ctx.moveTo(cx,       topY + H);
-    ctx.lineTo(cx + W/2, topY + H/2);
-    ctx.lineTo(cx + W/2, topY + H/2 + FH);
-    ctx.lineTo(cx,       topY + H + FH);
-    ctx.closePath();
-    ctx.fillStyle = def.right;
-    ctx.fill();
-    ctx.stroke();
+    drawSideFace(
+        [cx, topY + H],          [cx + W/2, topY + H/2],
+        [cx + W/2, topY + H/2 + FH], [cx, topY + H + FH],
+        rightDirt, strip
+    );
 
     // Небольшая ambient occlusion по краям
     const grad = ctx.createLinearGradient(0, topY + H, 0, topY + H + FH);
@@ -1815,8 +2684,63 @@ function drawGlassIcon(ctx, S) {
     ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fill();
 }
 
+function drawCactusIcon(ctx, S) {
+    // Фон — песок
+    ctx.fillStyle = "#e2c97e";
+    ctx.fillRect(0, 0, S, S);
+    ctx.fillStyle = "#c8a84b";
+    ctx.fillRect(0, S * 0.82, S, S * 0.18);
+
+    const g = "#3d8b40", gd = "#2a6b2c", gdd = "#1a4a1c";
+    function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+    function outline(x, y, w, h) {
+        ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+
+    const tw = S * 0.18;  // ширина ствола
+    const tx = (S - tw) / 2;
+    const ty = S * 0.08;  // верхушка ствола
+    const th = S * 0.76;  // высота ствола
+
+    // Ствол (тёмная правая грань для объёма)
+    rect(tx, ty, tw * 0.65, th, g);
+    rect(tx + tw * 0.65, ty, tw * 0.35, th, gd);
+    outline(tx, ty, tw, th);
+
+    // Левая рука (горизонтальная + вертикальная)
+    const aw = S * 0.22, ah = tw; // ширина и высота горизонтального сегмента
+    const armY = ty + th * 0.30;
+    rect(tx - aw, armY, aw, ah * 0.65, g);
+    rect(tx - aw, armY + ah * 0.65, aw, ah * 0.35, gd);
+    outline(tx - aw, armY, aw, ah);
+    // вертикальный отросток
+    rect(tx - aw, armY - th * 0.22, ah * 0.65, th * 0.22, g);
+    rect(tx - aw + ah * 0.65, armY - th * 0.22, ah * 0.35, th * 0.22, gd);
+    outline(tx - aw, armY - th * 0.22, ah, th * 0.22);
+
+    // Правая рука
+    const armY2 = ty + th * 0.50;
+    rect(tx + tw, armY2, aw, ah * 0.65, g);
+    rect(tx + tw, armY2 + ah * 0.65, aw, ah * 0.35, gd);
+    outline(tx + tw, armY2, aw, ah);
+    rect(tx + tw + aw - ah * 0.65, armY2 - th * 0.18, ah * 0.65, th * 0.18, g);
+    rect(tx + tw + aw - ah * 0.65 + ah * 0.65, armY2 - th * 0.18, ah * 0.35, th * 0.18, gdd);
+    outline(tx + tw + aw - ah, armY2 - th * 0.18, ah, th * 0.18);
+
+    // Розовые цветки на стволе
+    function flower(cx, cy) {
+        ctx.beginPath(); ctx.arc(cx, cy, S * 0.055, 0, Math.PI * 2);
+        ctx.fillStyle = "#ff50a0"; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, S * 0.022, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffe000"; ctx.fill();
+    }
+    flower(tx - S * 0.035, ty + th * 0.45);
+    flower(tx + tw + S * 0.035, ty + th * 0.65);
+}
+
 // Отрисовываем все иконки при старте
-["grass","stone","wood","leaf","sand","rainbow","aquarium","glass"].forEach(type => {
+["grass","stone","wood","leaf","sand","cactus","rainbow","aquarium","glass"].forEach(type => {
     const c = document.getElementById("icon-" + type);
     if (c) drawBlockIcon(c, type);
 });
@@ -1842,7 +2766,7 @@ function updateRainbowUI() {
 updateRainbowUI();
 
 // ─── ВЫБОР СЛОТА ─────────────────────────────────────────────────────────────
-const SLOT_TYPES = ["grass","stone","wood","leaf","sand","rainbow","aquarium","glass"];
+const SLOT_TYPES = ["grass","stone","wood","leaf","sand","cactus","rainbow","aquarium","glass"];
 
 function selectSlot(idx) {
     const type = SLOT_TYPES[idx];
@@ -1881,11 +2805,17 @@ document.addEventListener("keydown", e => {
         const n = parseInt(e.code.replace("Digit","")) - 1;
         if (n >= 0 && n < SLOT_TYPES.length) selectSlot(n);
     }
-    // Tab — следующий слот
+    // Tab — следующий доступный слот (пропускает rainbow если 0)
     if (e.code === "Tab") {
         e.preventDefault();
         const cur = SLOT_TYPES.indexOf(selected);
-        selectSlot((cur + 1) % SLOT_TYPES.length);
+        for (let i = 1; i <= SLOT_TYPES.length; i++) {
+            const next = (cur + i) % SLOT_TYPES.length;
+            const t = SLOT_TYPES[next];
+            if (t === "rainbow" && rainbowCrafted === 0) continue;
+            selectSlot(next);
+            break;
+        }
     }
 });
 
@@ -2055,17 +2985,26 @@ function animate(now) {
         }
     }
 
+    _frameStartMs = performance.now();
     let t0, t1;
 
     accumTime += dt;
     posPrev.copy(pos);
     t0 = performance.now();
-    while (accumTime >= FIXED_DT) {
+    // Максимум 5 тиков за кадр — защита от «спирали смерти» после лаг-спайков
+    let physIter = 0;
+    while (accumTime >= FIXED_DT && physIter < 5) {
         physicsTick();
         accumTime -= FIXED_DT;
-        simTime += FIXED_DT;
+        simTime   += FIXED_DT;
+        physIter++;
     }
+    // Если накопилось слишком много — сбрасываем остаток вместо бесконечного догона
+    if (accumTime > FIXED_DT * 4) accumTime = 0;
     if (profilerOn) profMark("physics", performance.now() - t0);
+
+    // scheduleChunks — один раз за кадр, не внутри цикла физики
+    scheduleChunks(pos.x, pos.z);
 
     const alpha = Math.min(accumTime / FIXED_DT, 1);
     interpPos.lerpVectors(posPrev, pos, alpha);
@@ -2077,11 +3016,24 @@ function animate(now) {
     hudEl.textContent = `X:${Math.round(pos.x)} \u00a0 Y:${Math.round(feetY())} \u00a0 Z:${Math.round(pos.z)}`;
     if (hudEl._dbg) hudEl.textContent += `\n${hudEl._dbg}`;
 
-    // Оверлеи
+    // Оверлеи + динамический туман
     const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
     const headInLava  = isLavaAt (Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
     underwaterDiv.style.display  = headInWater ? "block" : "none";
     lavaOverlayDiv.style.display = headInLava  ? "block" : "none";
+    // Туман под водой: синий, ближний — имитирует мутную воду
+    if (headInWater) {
+        scene.fog.color.set(0x004488);
+        scene.fog.near = 2; scene.fog.far = 16;
+    } else if (headInLava) {
+        scene.fog.color.set(0x330000);
+        scene.fog.near = 1; scene.fog.far = 6;
+    } else {
+        scene.fog.color.copy(_skyColor);
+        scene.fog.near = 80; scene.fog.far = 160;
+    }
+    // День / ночь — только когда не под водой/лавой
+    if (!headInWater && !headInLava) updateDayNight(dt);
 
     // Рыбы — LOD по дистанции
     t0 = performance.now();
@@ -2103,7 +3055,8 @@ function animate(now) {
 
     // Свиньи
     t0 = performance.now();
-    updatePigs(simTime);
+    if (catLife)  updateMice(simTime);
+    else          updatePigs(simTime);
     if (profilerOn) profMark("pigs", performance.now() - t0);
 
     // Облака
@@ -2121,7 +3074,13 @@ function animate(now) {
     processBuildQueue();
     if (profilerOn) profMark("buildQueue", performance.now() - t0);
 
-    // Подсветка от "факела"
+
+    // Перестройка грязных чанков (после любых изменений блоков за этот кадр)
+    t0 = performance.now();
+    flushDirtyChunks();
+    if (profilerOn) profMark("flushChunks", performance.now() - t0);
+
+    // Подсветка от "факела" (только instanced-типы: water/glass/rainbow/aquarium)
     t0 = performance.now();
     updateTorchLight(interpPos.x, interpPos.y, interpPos.z);
     if (profilerOn) profMark("torchLight", performance.now() - t0);
@@ -2143,7 +3102,7 @@ function animate(now) {
         profMark("render", t1 - t0);
         profMark("TOTAL", (t1 - (now)) + rawDt * 1000 * 0); // общее время кадра
         // Считаем TOTAL как сумму всех секций
-        const total = ["physics","fish","pigs","clouds","buildQueue","torchLight","raycast","render"]
+        const total = ["physics","fish","pigs","clouds","buildQueue","flushChunks","torchLight","raycast","render"]
             .reduce((s, k) => s + (profStats[k] || 0), 0);
         profStats["TOTAL"] = total;
     }
@@ -2157,6 +3116,8 @@ const btnNewGame  = document.getElementById("btn-new-game");
 const btnLoadGame = document.getElementById("btn-load-game");
 const menuHint    = document.getElementById("menu-hint");
 const langSelect  = document.getElementById("lang-select");
+// Перевод слайдера 0-100 → 2-15 чанков
+function sliderToChunks(v) { return Math.round(2 + (15 - 2) * v / 100); }
 
 // ─── ПЕРЕВОДЫ ────────────────────────────────────────────────────────────────
 const I18N = {
@@ -2170,6 +3131,7 @@ const I18N = {
         saveErr:    "✗ Ошибка сохранения",
         loaded:     (n) => `↑ Загружено (${n} изменений)`,
         saveTip:    "💾",
+        renderDist: "ДАЛЬНОСТЬ ПРОРИСОВКИ",
     },
     en: {
         newGame:    "🌍 NEW GAME",
@@ -2181,6 +3143,7 @@ const I18N = {
         saveErr:    "✗ Save error",
         loaded:     (n) => `↑ Loaded (${n} changes)`,
         saveTip:    "💾",
+        renderDist: "RENDER DISTANCE",
     },
     de: {
         newGame:    "🌍 NEUES SPIEL",
@@ -2192,6 +3155,7 @@ const I18N = {
         saveErr:    "✗ Speicherfehler",
         loaded:     (n) => `↑ Geladen (${n} Änderungen)`,
         saveTip:    "💾",
+        renderDist: "SICHTWEITE",
     },
 };
 
@@ -2231,6 +3195,8 @@ function hideSplash() {
 }
 
 async function startGame(loadSave) {
+    RENDER_DIST = sliderToChunks(+spRd.value);
+    applyCatLife(); // применяем после создания pigGroup/mouseGroup
     hideSplash();
     requestPersistentStorage();
     if (loadSave) {
@@ -2240,7 +3206,22 @@ async function startGame(loadSave) {
         await loadWorldDelta(saved);
     } else {
         initWorldSeed(Math.random() * 0xFFFFFFFF | 0);
-        scheduleChunks(0, 0);
+        // Ищем точку спавна вне воды — спираль от (0,0)
+        let spawnX = 0, spawnZ = 0;
+        outer: for (let r = 0; r <= 20; r++) {
+            for (let dx = -r; dx <= r; dx++) {
+                for (let dz = -r; dz <= r; dz++) {
+                    if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+                    const sx = dx * 3, sz = dz * 3;
+                    if (!inLake(sx, sz) && !inSand(sx, sz)) {
+                        spawnX = sx; spawnZ = sz; break outer;
+                    }
+                }
+            }
+        }
+        const spawnY = Math.max(terrainHeight(spawnX, spawnZ), WATER_LEVEL + 1) + 3;
+        camera.position.set(spawnX, spawnY, spawnZ);
+        scheduleChunks(spawnX, spawnZ);
         worldGenDone = true;
     }
     requestAnimationFrame(animate);
