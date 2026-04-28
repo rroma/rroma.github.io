@@ -420,7 +420,7 @@ body { margin: 0; overflow: hidden; background: #000; }
     <span class="sval" id="sp-cs-val">8</span>
   </div>
   <div class="srow">
-    <label>ПОДЗЕМНАЯ ПЕЩЕРА<br><span style="font-size:10px;opacity:.5">применится при новой игре</span></label>
+    <label>ПОДЗЕМНЫЙ МИР<br><span style="font-size:10px;opacity:.5">применится при новой игре</span></label>
     <input type="checkbox" id="sp-cave" checked>
   </div>
   <button id="btn-settings-close">ЗАКРЫТЬ</button>
@@ -559,8 +559,9 @@ function updateDayNight(dt) {
     sun.intensity = dayF * 1.3;
     sun.color.setHex(sh > 0.25 ? 0xfff4cc : 0xff9944); // белый днём, оранжевый на рассвете/закате
 
-    // Фоновое освещение: 0.12 ночью → 0.55 днём
-    ambientLight.intensity = 0.12 + dayF * 0.43;
+    // Фоновое освещение: ночью минимум зависит от режима кота
+    const nightMin = catLife ? 0.45 : 0.12;
+    ambientLight.intensity = nightMin + dayF * (0.55 - nightMin);
 }
 
 // ─── INSTANCED MESH ──────────────────────────────────────────────────────────
@@ -1150,7 +1151,8 @@ const saveToast = document.getElementById("save-toast");
 let catLife = localStorage.getItem("mishaCraft_catLife") === "1";
 
 function applyCatLife() {
-    PLAYER_H = catLife ? 1.0 : 1.75;
+    PLAYER_H    = catLife ? 1.0 : 1.75;
+    JUMP_FORCE  = catLife ? JUMP_FORCE_CAT : JUMP_FORCE_NORMAL;
     // Мыши только в режиме кота
     for (const m of mouseGroup) { m.visible = catLife; }
     // Свиньи только без кота
@@ -1338,7 +1340,8 @@ async function saveWorld() {
     try {
         const placed  = [...userPlaced.values()];
         const removed = [...userRemoved];
-        await dbPut("delta", { seed: _worldSeed, placed, removed });
+        const playerPos = { x: pos.x, y: pos.y, z: pos.z, yaw, pitch };
+        await dbPut("delta", { seed: _worldSeed, placed, removed, playerPos });
         const total = placed.length + removed.length;
         showToast(t("saved", total));
     } catch(e) {
@@ -2116,7 +2119,9 @@ const FIXED_DT   = 1 / 60;
 let PLAYER_H   = catLife ? 1.0 : 1.75; // catLife определён раньше
 const PLAYER_R   = 0.28;
 const GRAVITY    = 0.018;
-const JUMP_FORCE = 0.30;
+const JUMP_FORCE_NORMAL = 0.30;
+const JUMP_FORCE_CAT    = 0.42;
+let   JUMP_FORCE        = catLife ? JUMP_FORCE_CAT : JUMP_FORCE_NORMAL;
 const SWIM_UP    = 0.12;
 const WATER_DRAG = 0.78;
 
@@ -2736,13 +2741,7 @@ function drawGlassIcon(ctx, S) {
 }
 
 function drawCactusIcon(ctx, S) {
-    // Фон — песок
-    ctx.fillStyle = "#e2c97e";
-    ctx.fillRect(0, 0, S, S);
-    ctx.fillStyle = "#c8a84b";
-    ctx.fillRect(0, S * 0.82, S, S * 0.18);
-
-    const g = "#3d8b40", gd = "#2a6b2c", gdd = "#1a4a1c";
+    const g = "#5cb85c", gd = "#3d8b40", gdd = "#2a6b2c";
     function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
     function outline(x, y, w, h) {
         ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 1;
@@ -3253,7 +3252,17 @@ async function startGame(loadSave) {
     requestPersistentStorage();
     if (loadSave) {
         const saved = await initWorldFromDB();
-        scheduleChunks(0, 0);
+        if (saved?.playerPos) {
+            const p = saved.playerPos;
+            pos.set(p.x, p.y, p.z);
+            posPrev.set(p.x, p.y, p.z);
+            camera.position.set(p.x, p.y, p.z);
+            yaw   = p.yaw   ?? 0;
+            pitch = p.pitch ?? 0;
+            scheduleChunks(p.x, p.z);
+        } else {
+            scheduleChunks(0, 0);
+        }
         worldGenDone = true;
         await loadWorldDelta(saved);
     } else {
