@@ -511,7 +511,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 scene.fog = new THREE.Fog(0x87ceeb, 80, 160);
 
-const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.3, 300);
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 300);
 camera.position.set(0, 20, 12);
 camera.rotation.order = "YXZ";
 
@@ -1481,15 +1481,20 @@ async function loadWorldDelta(saved) {
 
         // Потом ставим блоки которые игрок добавил
         for (const b of delta.placed) {
+            // Локальная дельта использует поле "type", сервер шлёт "blockType" — поддерживаем оба
+            const bType = b.type ?? b.blockType;
             const k = bkey(b.x, b.y, b.z);
             const existing = blockMap.get(k);
             if (existing) {
                 if (existing.type === "aquarium") removeAquariumFish(existing.x, existing.y, existing.z);
                 removeBlock(existing);
             }
-            addBlock(b.x, b.y, b.z, b.type);
-            if (!addBlock._lastFail && b.type === "aquarium") spawnAquariumFish(b.x, b.y, b.z);
-            userPlaced.set(k, { x: b.x, y: b.y, z: b.z, type: b.type });
+            // Снимаем флаг "удалён" — placed имеет приоритет над removed для одного и того же ключа
+            userRemoved.delete(k);
+            addBlock._lastFail = null;
+            addBlock(b.x, b.y, b.z, bType);
+            if (!addBlock._lastFail && bType === "aquarium") spawnAquariumFish(b.x, b.y, b.z);
+            userPlaced.set(k, { x: b.x, y: b.y, z: b.z, type: bType });
             applied++;
         }
 
@@ -2315,10 +2320,10 @@ function physicsTick() {
     let dx = 0, dz = 0;
 
     // Клавиатура
-    if (keys["KeyW"]) { dx -= sinY * spd; dz -= cosY * spd; }
-    if (keys["KeyS"]) { dx += sinY * spd; dz += cosY * spd; }
-    if (keys["KeyA"]) { dx -= cosY * spd; dz += sinY * spd; }
-    if (keys["KeyD"]) { dx += cosY * spd; dz -= sinY * spd; }
+    if (keys["KeyW"] || keys["ArrowUp"])    { dx -= sinY * spd; dz -= cosY * spd; }
+    if (keys["KeyS"] || keys["ArrowDown"])  { dx += sinY * spd; dz += cosY * spd; }
+    if (keys["KeyA"] || keys["ArrowLeft"])  { dx -= cosY * spd; dz += sinY * spd; }
+    if (keys["KeyD"] || keys["ArrowRight"]) { dx += cosY * spd; dz -= sinY * spd; }
 
     // Джойстик (joyX = вправо, joyY > 0 = тянем вниз = идём вперёд)
     if (joyX !== 0 || joyY !== 0) {
@@ -2555,14 +2560,18 @@ function doPlace() {
             selected = "grass";
         }
     } else {
+        // Снимаем флаг "удалён" до addBlock — иначе он откажется ставить блок
+        const pk = bkey(bx, by, bz);
+        userRemoved.delete(pk);
         addBlock._lastFail = null;
         addBlock(bx, by, bz, selected);
         if (selected === "aquarium") spawnAquariumFish(bx, by, bz);
         if (!addBlock._lastFail) {
-            const pk = bkey(bx, by, bz);
             userPlaced.set(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
-            userRemoved.delete(pk);
             mpSendBlock("place", bx, by, bz, selected);
+        } else if (worldGenKeys.has(pk)) {
+            // Если addBlock провалился по другой причине — восстанавливаем флаг удалённости
+            userRemoved.add(pk);
         }
     }
     flushColors();
@@ -2996,6 +3005,7 @@ document.querySelectorAll(".slot").forEach((slot) => {
 document.addEventListener("keydown", e => {
     keys[e.code] = true;
     if (e.code === "Space") e.preventDefault();
+    if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
     // Цифры
     if (e.code.startsWith("Digit")) {
         const n = parseInt(e.code.replace("Digit","")) - 1;
@@ -3531,19 +3541,35 @@ function connectMultiplayer(serverUrl, playerName) {
                 }
                 break;
 
-            case "block":
+            case "block": {
+                const bk = bkey(msg.x, msg.y, msg.z);
                 if (msg.action === "place") {
+                    // Если в этом месте уже есть блок — заменим
+                    const existing = blockMap.get(bk);
+                    if (existing) {
+                        if (existing.type === "aquarium") removeAquariumFish(existing.x, existing.y, existing.z);
+                        removeBlock(existing);
+                    }
+                    // Снимаем флаг "удалён" до addBlock
+                    userRemoved.delete(bk);
+                    addBlock._lastFail = null;
                     addBlock(msg.x, msg.y, msg.z, msg.blockType);
+                    if (!addBlock._lastFail) {
+                        userPlaced.set(bk, { x: Math.round(msg.x), y: Math.round(msg.y), z: Math.round(msg.z), type: msg.blockType });
+                    }
                     flushColors();
                 } else if (msg.action === "remove") {
-                    const entry = blockMap.get(bkey(msg.x, msg.y, msg.z));
+                    const entry = blockMap.get(bk);
                     if (entry) { removeBlock(entry); flushColors(); }
+                    if (userPlaced.has(bk)) userPlaced.delete(bk);
+                    else if (worldGenKeys.has(bk)) userRemoved.add(bk);
                 }
                 markChunkDirty(
                     Math.floor(msg.x / CHUNK_SIZE),
                     Math.floor(msg.z / CHUNK_SIZE)
                 );
                 break;
+            }
         }
     };
 }
@@ -3618,7 +3644,8 @@ function animate(now) {
     if (profilerOn) profMark("physics", performance.now() - t0);
 
     // scheduleChunks — один раз за кадр, не внутри цикла физики
-    scheduleChunks(pos.x, pos.z);
+    // В мультиплеере не генерим мир пока сервер не прислал seed (init)
+    if (!isMultiplayer || _worldSeed !== 0) scheduleChunks(pos.x, pos.z);
 
     const alpha = Math.min(accumTime / FIXED_DT, 1);
     interpPos.lerpVectors(posPrev, pos, alpha);
