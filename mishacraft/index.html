@@ -49,6 +49,8 @@ body { margin: 0; overflow: hidden; background: #000; }
 .menu-btn.new-game:hover  { background: rgba(80,200,100,0.2); border-color: #5c8; }
 .menu-btn.load-game { border-color: rgba(80,160,255,0.6); }
 .menu-btn.load-game:hover { background: rgba(80,160,255,0.2); border-color: #5af; }
+.menu-btn.multi { border-color: rgba(255,180,50,0.6); }
+.menu-btn.multi:hover { background: rgba(255,180,50,0.15); border-color: #fb3; }
 .menu-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
 
 .menu-settings {
@@ -236,24 +238,53 @@ body { margin: 0; overflow: hidden; background: #000; }
 #btn-save:active { background: rgba(0,180,80,0.5); }
 #btn-save.saving { border-color: #0f0; }
 
-#btn-settings {
-    position: fixed; top: 42px; right: 10px; z-index: 30;
+#btn-pause {
+    position: fixed; top: 10px; right: 10px; z-index: 30;
     background: rgba(30,30,30,0.75);
     border: 1.5px solid rgba(255,255,255,0.25); border-radius: 8px;
     color: #fff; font-size: 16px; padding: 4px 10px;
     cursor: pointer; user-select: none; transition: background 0.15s;
 }
-#btn-settings:hover { background: rgba(60,60,60,0.9); }
+#btn-pause:hover { background: rgba(60,60,60,0.9); }
+
+#pause-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); z-index: 500;
+    align-items: center; justify-content: center;
+}
+#pause-overlay.open { display: flex; }
+#pause-panel {
+    background: rgba(12,12,12,0.97);
+    border: 1.5px solid rgba(255,255,255,0.18); border-radius: 14px;
+    padding: 30px 40px; min-width: 260px; text-align: center;
+    font-family: 'Courier New', monospace; color: #fff;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+    display: flex; flex-direction: column; gap: 12px;
+}
+#pause-panel h2 {
+    margin: 0 0 8px; font-size: 14px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.6);
+    border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;
+}
+.pause-btn {
+    background: rgba(255,255,255,0.07); border: 1.5px solid rgba(255,255,255,0.18);
+    border-radius: 8px; color: #fff; font-family: 'Courier New', monospace;
+    font-size: 13px; padding: 10px; cursor: pointer; letter-spacing: 1px;
+    transition: background 0.15s;
+}
+.pause-btn:hover { background: rgba(255,255,255,0.16); }
+.pause-btn.danger { border-color: rgba(255,80,80,0.5); }
+.pause-btn.danger:hover { background: rgba(255,80,80,0.15); }
 
 #settings-overlay {
     display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.45); z-index: 190;
+    background: rgba(0,0,0,0.45); z-index: 1100;
 }
 #settings-overlay.open { display: block; }
 
 #settings-panel {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-    z-index: 200; display: none;
+    z-index: 1200; display: none;
     background: rgba(12,12,12,0.97);
     border: 1.5px solid rgba(255,255,255,0.18); border-radius: 14px;
     padding: 24px 30px; min-width: 300px;
@@ -288,7 +319,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 #btn-settings-close:hover { background: rgba(255,255,255,0.16); }
 
 #save-toast {
-    position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
     z-index: 30;
     background: rgba(0,0,0,0.72);
     color: #0f0; font-family: monospace; font-size: 13px;
@@ -374,6 +405,8 @@ body { margin: 0; overflow: hidden; background: #000; }
 
     <button class="menu-btn new-game"  id="btn-new-game">🌍 НОВАЯ ИГРА</button>
     <button class="menu-btn load-game" id="btn-load-game" disabled>💾 ЗАГРУЗИТЬ</button>
+    <button class="menu-btn multi"     id="btn-multiplayer">🌐 МУЛЬТИПЛЕЕР</button>
+    <button class="menu-btn" id="btn-open-settings" style="border-color:rgba(255,255,255,0.3)">⚙ НАСТРОЙКИ</button>
     <div id="menu-hint">проверяем сохранение…</div>
   </div>
 </div>
@@ -381,7 +414,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 <div id="crosshair"></div>
 <div id="underwater"></div>
 <div id="lava-overlay"></div>
-<div id="hud">X: 0 &nbsp; Y: 0 &nbsp; Z: 0</div>
+<div id="hud">x: 0 &nbsp; y: 0 &nbsp; z: 0</div>
 <div id="fps">-- FPS</div>
 <div id="profiler" style="
     position:fixed; top:10px; right:90px;
@@ -392,38 +425,61 @@ body { margin: 0; overflow: hidden; background: #000; }
 "></div>
 <div id="loading"></div>
 
-<button id="btn-save" title="Сохранить мир (S)">💾</button>
-<button id="btn-settings" title="Настройки">⚙</button>
+<button id="btn-pause" title="Меню (Escape)">☰</button>
+
+<div id="pause-overlay">
+  <div id="pause-panel">
+    <h2>ПАУЗА</h2>
+    <button class="pause-btn" id="btn-resume">▶ ПРОДОЛЖИТЬ</button>
+    <button class="pause-btn" id="btn-save-pause">💾 СОХРАНИТЬ</button>
+    <button class="pause-btn danger" id="btn-to-menu">⏹ В ГЛАВНОЕ МЕНЮ</button>
+  </div>
+</div>
 <div id="save-toast"></div>
 
 <div id="settings-overlay"></div>
 <div id="settings-panel">
-  <h2>⚙ НАСТРОЙКИ</h2>
+  <h2 id="sp-title">⚙ НАСТРОЙКИ</h2>
   <div class="srow">
-    <label>🐱 ЖИЗНЬ КОТА<br><span style="font-size:10px;opacity:.5">1 блок высотой</span></label>
+    <label id="sp-label-cat">🐱 ЖИЗНЬ КОТА<br><span id="sp-label-cat-sub" style="font-size:10px;opacity:.5">1 блок высотой</span></label>
     <input type="checkbox" id="sp-cat">
   </div>
-  <div class="scat">ГРАФИКА</div>
+  <div class="scat" id="sp-label-graphics">ГРАФИКА</div>
   <div class="srow">
-    <label>ДАЛЬНОСТЬ ПРОРИСОВКИ</label>
+    <label id="sp-label-rd">ДАЛЬНОСТЬ ПРОРИСОВКИ</label>
     <input type="range" id="sp-rd" min="0" max="100" value="38">
     <span class="sval" id="sp-rd-val">7</span>
   </div>
   <div class="srow">
-    <label>БЮДЖЕТ КАДРА<br><span style="font-size:10px;opacity:.5">мс на генерацию чанков</span></label>
+    <label id="sp-label-budget">БЮДЖЕТ КАДРА<br><span id="sp-label-budget-sub" style="font-size:10px;opacity:.5">мс на генерацию чанков</span></label>
     <input type="range" id="sp-budget" min="1" max="8" step="1" value="3">
     <span class="sval" id="sp-budget-val">3</span>
   </div>
   <div class="srow">
-    <label>РАЗМЕР ЧАНКА<br><span style="font-size:10px;opacity:.5">применится при новой игре</span></label>
+    <label id="sp-label-cs">РАЗМЕР ЧАНКА<br><span id="sp-label-cs-sub" style="font-size:10px;opacity:.5">применится при новой игре</span></label>
     <input type="range" id="sp-cs" min="6" max="16" step="2" value="8">
     <span class="sval" id="sp-cs-val">8</span>
   </div>
   <div class="srow">
-    <label>ПОДЗЕМНЫЙ МИР<br><span style="font-size:10px;opacity:.5">применится при новой игре</span></label>
+    <label id="sp-label-cave">ПОДЗЕМНЫЙ МИР<br><span id="sp-label-cave-sub" style="font-size:10px;opacity:.5">применится при новой игре</span></label>
     <input type="checkbox" id="sp-cave" checked>
   </div>
-  <button id="btn-settings-close">ЗАКРЫТЬ</button>
+  <div class="scat" id="sp-label-multiplayer">МУЛЬТИПЛЕЕР</div>
+  <div class="srow" style="flex-direction:column; align-items:stretch; gap:6px;">
+    <label id="sp-label-serverurl" style="font-size:11px;">АДРЕС СЕРВЕРА</label>
+    <input type="text" id="sp-server-url" placeholder="ws://localhost:3000/ws"
+      style="background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.18);
+             border-radius:6px; color:#fff; font-family:'Courier New',monospace;
+             font-size:11px; padding:6px 8px; outline:none;">
+  </div>
+  <div class="srow">
+    <label id="sp-label-playername">ИМЯ ИГРОКА</label>
+    <input type="text" id="sp-player-name" maxlength="16" placeholder="Player"
+      style="flex:1.4; background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.18);
+             border-radius:6px; color:#fff; font-family:'Courier New',monospace;
+             font-size:12px; padding:6px 8px; outline:none; text-align:right;">
+  </div>
+  <button id="btn-settings-close" data-i18n="close">ЗАКРЫТЬ</button>
 </div>
 
 <div id="inventory">
@@ -476,6 +532,14 @@ scene.add(sun);
 // ─── ДЕНЬ / НОЧЬ ─────────────────────────────────────────────────────────────
 const DAY_DURATION = 600; // секунд на полный цикл (10 минут)
 let dayTime = 0.28;       // начинаем с утра (0=полночь, 0.5=полдень)
+let _dayTimeAnchorVal = 0.28;  // значение dayTime в момент anchoring
+let _dayTimeAnchorMs  = Date.now(); // реальное время в момент anchoring
+
+function anchorDayTime(val) {
+    _dayTimeAnchorVal = val;
+    _dayTimeAnchorMs  = Date.now();
+    dayTime = val;
+}
 
 // Заранее выделяем цвета (без GC в каждом кадре)
 const _skyDay   = new THREE.Color(0x87ceeb);
@@ -522,7 +586,8 @@ _starsMesh.renderOrder = -2;
 scene.add(_starsMesh);
 
 function updateDayNight(dt) {
-    dayTime = (dayTime + dt / DAY_DURATION) % 1;
+    const elapsed = (Date.now() - _dayTimeAnchorMs) / 1000;
+    dayTime = (_dayTimeAnchorVal + elapsed / DAY_DURATION) % 1;
 
     // sunAngle: 0.25=восход, 0.5=полдень, 0.75=закат
     const sunAngle = (dayTime - 0.25) * Math.PI * 2;
@@ -1144,7 +1209,6 @@ const worldGenKeys = new Set();
 let   worldGenDone = false;      // true после загрузки стартовых чанков
 
 let _isSaving = false;
-const saveBtn   = document.getElementById("btn-save");
 const saveToast = document.getElementById("save-toast");
 
 // ─── НАСТРОЙКИ ───────────────────────────────────────────────────────────────
@@ -1160,7 +1224,7 @@ function applyCatLife() {
 }
 // applyCatLife() вызывается в startGame() — после создания всех сущностей
 
-const btnSettings      = document.getElementById("btn-settings");
+const btnSettings      = document.getElementById("btn-open-settings");
 const settingsPanel    = document.getElementById("settings-panel");
 const settingsOverlay  = document.getElementById("settings-overlay");
 const btnSettingsClose = document.getElementById("btn-settings-close");
@@ -1217,6 +1281,16 @@ spCave.addEventListener("change", () => {
     localStorage.setItem("mishaCraft_cave", spCave.checked ? "1" : "0");
 });
 
+const spServerUrl   = document.getElementById("sp-server-url");
+const spPlayerName  = document.getElementById("sp-player-name");
+
+spServerUrl.value  = localStorage.getItem("mishaCraft_serverUrl") ?? "ws://localhost:3000/ws";
+if (!localStorage.getItem("mishaCraft_serverUrl")) localStorage.setItem("mishaCraft_serverUrl", spServerUrl.value);
+spPlayerName.value = localStorage.getItem("mishaCraft_playerName") || "";
+
+spServerUrl.addEventListener("input",  () => localStorage.setItem("mishaCraft_serverUrl",  spServerUrl.value.trim()));
+spPlayerName.addEventListener("input", () => localStorage.setItem("mishaCraft_playerName", spPlayerName.value.trim()));
+
 function openSettings() {
     settingsPanel.classList.add("open");
     settingsOverlay.classList.add("open");
@@ -1231,11 +1305,36 @@ btnSettings.addEventListener("click", openSettings);
 btnSettingsClose.addEventListener("click", closeSettings);
 settingsOverlay.addEventListener("click", closeSettings);
 
-// Escape: если нет pointer lock — открыть/закрыть настройки
+// Пауза
+const pauseOverlay = document.getElementById("pause-overlay");
+function openPause() {
+    if (document.pointerLockElement) document.exitPointerLock();
+    pauseOverlay.classList.add("open");
+    document.getElementById("btn-save-pause").style.display = isMultiplayer ? "none" : "";
+}
+function closePause() {
+    pauseOverlay.classList.remove("open");
+}
+
+document.getElementById("btn-pause").addEventListener("click", openPause);
+document.getElementById("btn-resume").addEventListener("click", () => {
+    closePause();
+    renderer.domElement.requestPointerLock?.();
+});
+document.getElementById("btn-save-pause").addEventListener("click", () => {
+    saveWorld();
+});
+document.getElementById("btn-to-menu").addEventListener("click", () => {
+    location.reload();
+});
+
+// Escape в игре → пауза; в настройках → закрыть настройки
 document.addEventListener("keydown", e => {
     if (e.code === "Escape") {
-        if (!document.pointerLockElement) {
-            settingsPanel.classList.contains("open") ? closeSettings() : openSettings();
+        if (settingsPanel.classList.contains("open")) {
+            closeSettings();
+        } else if (!document.pointerLockElement) {
+            pauseOverlay.classList.contains("open") ? closePause() : openPause();
         }
     }
 });
@@ -1333,10 +1432,9 @@ async function dbGet(key) {
 
 // ── Сохранение ───────────────────────────────────────────────────────────────
 async function saveWorld() {
+    if (isMultiplayer) return; // сервер сам сохраняет состояние мира
     if (_isSaving) return;
     _isSaving = true;
-    saveBtn.classList.add("saving");
-    saveBtn.textContent = "⏳";
     try {
         const placed  = [...userPlaced.values()];
         const removed = [...userRemoved];
@@ -1349,8 +1447,6 @@ async function saveWorld() {
         console.error("saveWorld:", e);
     } finally {
         _isSaving = false;
-        saveBtn.classList.remove("saving");
-        saveBtn.textContent = "💾";
     }
 }
 
@@ -1360,10 +1456,12 @@ async function initWorldFromDB() {
         const saved = await dbGet("delta");
         const seed  = saved?.seed ?? (Math.random() * 0xFFFFFFFF | 0);
         initWorldSeed(seed);
+        spawnPigs();
         return saved; // вернём для накатки дельты после генерации
     } catch(e) {
         console.error("initWorldFromDB:", e);
         initWorldSeed(Math.random() * 0xFFFFFFFF | 0);
+        spawnPigs();
         return null;
     }
 }
@@ -1420,6 +1518,7 @@ function addBlock(x, y, z, type) {
     type = type || "grass";
     const k = bkey(x, y, z);
     if (blockMap.has(k)) { addBlock._lastFail = `occupied`; return; }
+    if (userRemoved.has(k)) { addBlock._lastFail = `removed`; return; }
     addBlock._lastFail = null;
 
     const rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
@@ -1598,7 +1697,7 @@ function coordHash(x, y, z) {
     let h = (Math.imul(x | 0, 1664525) + Math.imul(y | 0, 22695477) + Math.imul(z | 0, 6364136)) >>> 0;
     h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
     h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
-    return h ^ (h >>> 16);
+    return (h ^ (h >>> 16)) >>> 0;
 }
 
 // ─── ЧАНКИ ───────────────────────────────────────────────────────────────────
@@ -1661,48 +1760,46 @@ function generateChunk(cx, cz) {
                     addBlock(x, top, z, "sand");
                     // Под поверхностью ещё 1-2 блока песка
                     addBlock(x, top - 1, z, "sand");
-                    if (rng() < 0.5) addBlock(x, top - 2, z, "sand");
-                    // Кактус: 1.5% шанс, высота 3-5 блоков + ответвления
-                    if (rng() < 0.015) {
-                        const ch = 3 + Math.floor(rng() * 3);
+                    if (coordHash(x, 99, z) % 2 === 0) addBlock(x, top - 2, z, "sand");
+                    // Кактус: 1.5% шанс (coordHash % 67 === 0 ≈ 1.49%)
+                    if (coordHash(x, 0, z) % 67 === 0) {
+                        const ch = 3 + coordHash(x, 1, z) % 3;
                         for (let cy = 1; cy <= ch; cy++) addBlock(x, top + cy, z, "cactus");
-                        // Маленькие цветы сбоку ствола (1-2 штуки на случайных высотах)
+                        // Маленькие цветы сбоку ствола
                         const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-                        const numFlowers = 1 + (rng() < 0.55 ? 1 : 0);
+                        const numFlowers = 1 + (coordHash(x, 2, z) % 2);
                         for (let f = 0; f < numFlowers; f++) {
-                            const fy = 1 + Math.floor(rng() * ch);
-                            const [fd, fz2] = dirs[Math.floor(rng() * 4)];
+                            const fy = 1 + coordHash(x, 10 + f, z) % ch;
+                            const [fd, fz2] = dirs[coordHash(x, 20 + f, z) % 4];
                             addBlock(x + fd, top + fy, z + fz2, "flower");
                         }
-                        // Ответвления: 1-2 руки на случайной высоте
-                        const arms = 1 + (rng() < 0.5 ? 1 : 0);
+                        // Ответвления
+                        const arms = 1 + coordHash(x, 3, z) % 2;
                         for (let a = 0; a < arms; a++) {
-                            const armH = 1 + Math.floor(rng() * (ch - 2)); // высота ответвления
-                            const [dx, dz] = dirs[Math.floor(rng() * 4)];
-                            const armLen = 1 + (rng() < 0.4 ? 1 : 0); // 1-2 блока в сторону
+                            const armH = 1 + coordHash(x, 30 + a, z) % Math.max(1, ch - 2);
+                            const [dx, dz2] = dirs[coordHash(x, 40 + a, z) % 4];
+                            const armLen = 1 + (coordHash(x, 50 + a, z) % 3 < 1 ? 1 : 0);
                             for (let d = 1; d <= armLen; d++)
-                                addBlock(x + dx*d, top + armH, z + dz*d, "cactus");
-                            // Вверх с конца ответвления
-                            const upH = 1 + Math.floor(rng() * 2);
+                                addBlock(x + dx*d, top + armH, z + dz2*d, "cactus");
+                            const upH = 1 + coordHash(x, 60 + a, z) % 2;
                             for (let cy = 1; cy <= upH; cy++)
-                                addBlock(x + dx*armLen, top + armH + cy, z + dz*armLen, "cactus");
+                                addBlock(x + dx*armLen, top + armH + cy, z + dz2*armLen, "cactus");
                         }
                     }
                 }
 
                 const tropical = isTropical(x, z);
-                const treeChance = tropical ? 0.0055 : 0.022;
-                if (surfaceType === "grass" && !isDesert(x, z) && rng() < treeChance) {
+                // coordHash % дробь → используем большой модуль для точности
+                const treeThresh = tropical ? 18 : 45; // из 1000: ~1.8% и ~4.5%
+                if (surfaceType === "grass" && !isDesert(x, z) && coordHash(x, 200, z) % 1000 < treeThresh) {
                     if (tropical) {
                         // ── Высокое дерево с ярусами как у пальмы ──────────
-                        const th = 17 + (rng() < 0.5 ? 2 : 0) + (rng() < 0.3 ? 2 : 0);
-                        // Голый ствол
+                        const th = 17 + (coordHash(x,201,z)%2===0 ? 2:0) + (coordHash(x,202,z)%3===0 ? 2:0);
                         for (let y = 1; y <= th; y++) addBlock(x, top + y, z, "wood");
-                        // Рандомизированные ярусы
-                        const numTiers   = 3 + (rng() < 0.5 ? 1 : 0) + (rng() < 0.3 ? 1 : 0); // 3-5
-                        const tierStep   = 2 + Math.floor(rng() * 2); // шаг 2-3 блока
-                        const armLen     = 4 + (rng() < 0.5 ? 1 : 0); // длина ветки 4-5
-                        const hasDiag    = rng() < 0.6; // диагональные ветки не всегда
+                        const numTiers = 3 + (coordHash(x,203,z)%2) + (coordHash(x,204,z)%3===0?1:0);
+                        const tierStep = 2 + coordHash(x,205,z) % 2;
+                        const armLen   = 4 + coordHash(x,206,z) % 2;
+                        const hasDiag  = coordHash(x,207,z) % 10 < 6;
                         for (let t = 0; t < numTiers; t++) {
                             const ty = th - t * tierStep;
                             if (ty < 3) break;
@@ -1725,14 +1822,12 @@ function generateChunk(cx, cz) {
                         }
                     } else {
                         // ── Обычное дерево ─────────────────────────────────
-                        const th = 3 + (rng() < 0.3 ? 1 : 0);
+                        const th = 3 + (coordHash(x,210,z) % 3 === 0 ? 1 : 0);
                         for (let y = 1; y <= th; y++) addBlock(x, top + y, z, "wood");
-                        // Нижний слой кроны — широкий (r=2)
                         for (let lx = -2; lx <= 2; lx++)
                             for (let lz = -2; lz <= 2; lz++)
                                 if (Math.abs(lx) + Math.abs(lz) <= 3)
                                     addBlock(x + lx, top + th + 1, z + lz, "leaf");
-                        // Верхний слой — 3×3
                         for (let lx = -1; lx <= 1; lx++)
                             for (let lz = -1; lz <= 1; lz++)
                                 addBlock(x + lx, top + th + 2, z + lz, "leaf");
@@ -1782,7 +1877,7 @@ function unloadChunk(cx, cz) {
     // а граничные грани невидимы со стороны выгруженного чанка.
 }
 
-function scheduleChunks(px, pz) {
+function scheduleChunks(px, pz, flush) {
     const pcx = Math.floor(px / CHUNK_SIZE);
     const pcz = Math.floor(pz / CHUNK_SIZE);
     for (const [k] of loadedChunks) {
@@ -1791,18 +1886,22 @@ function scheduleChunks(px, pz) {
             unloadChunk(cx, cz); loadedChunks.delete(k);
         }
     }
+    if (flush) buildQueue = [];
+    const inQueue = new Set(buildQueue.map(q => q.k));
     const needed = [];
     for (let dcx = -RENDER_DIST; dcx <= RENDER_DIST; dcx++) {
         for (let dcz = -RENDER_DIST; dcz <= RENDER_DIST; dcz++) {
             const cx = pcx + dcx, cz = pcz + dcz;
             if (Math.abs(cx) > WORLD_LIMIT || Math.abs(cz) > WORLD_LIMIT) continue;
             const k = chunkKey(cx, cz);
-            if (!loadedChunks.has(k) && !buildQueue.find(q => q.k === k))
+            if (!loadedChunks.has(k) && !inQueue.has(k))
                 needed.push({ cx, cz, k, dist: dcx*dcx + dcz*dcz });
         }
     }
     needed.sort((a, b) => a.dist - b.dist);
-    buildQueue.push(...needed);
+    // Closest chunks go first — prepend if flushing, otherwise append
+    if (flush) buildQueue = needed;
+    else buildQueue.push(...needed);
 }
 
 const loadingEl = document.getElementById("loading");
@@ -1917,26 +2016,44 @@ const PIG_SNOUT_GEO = new THREE.BoxGeometry(0.22, 0.18, 0.12);
 const PIG_COUNT   = 5;
 const MOUSE_COUNT = 10;
 
-for (let i = 0; i < PIG_COUNT; i++) {
-    const pig = new THREE.Group();
-    pig.add(new THREE.Mesh(PIG_BODY, PIG_MAT));
-    const head = new THREE.Mesh(PIG_HEAD, PIG_MAT);
-    head.position.set(0, 0.15, -0.55); pig.add(head);
-    const snout = new THREE.Mesh(PIG_SNOUT_GEO, PIG_SNOUT_MAT);
-    snout.position.set(0, 0.12, -0.78); pig.add(snout);
-    for (const [lx, ly, lz] of [[-0.3,-0.47,-0.14],[0.3,-0.47,-0.14],[-0.3,-0.47,0.14],[0.3,-0.47,0.14]]) {
-        const leg = new THREE.Mesh(PIG_LEG, PIG_MAT);
-        leg.position.set(lx, ly, lz); pig.add(leg);
+// Детерминированная RNG для свиней — зависит только от seed и индекса
+function pigRng(pigIdx, n) {
+    let h = (_worldSeed | 0) ^ Math.imul(pigIdx + 1, 0x9e3779b9) ^ Math.imul(n + 1, 0x6c62272e);
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+    h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967295;
+}
+
+function spawnPigs() {
+    for (const p of pigGroup) scene.remove(p);
+    pigGroup.length = 0;
+    for (let i = 0; i < PIG_COUNT; i++) {
+        const pig = new THREE.Group();
+        pig.add(new THREE.Mesh(PIG_BODY, PIG_MAT));
+        const head = new THREE.Mesh(PIG_HEAD, PIG_MAT);
+        head.position.set(0, 0.15, -0.55); pig.add(head);
+        const snout = new THREE.Mesh(PIG_SNOUT_GEO, PIG_SNOUT_MAT);
+        snout.position.set(0, 0.12, -0.78); pig.add(snout);
+        for (const [lx, ly, lz] of [[-0.3,-0.47,-0.14],[0.3,-0.47,-0.14],[-0.3,-0.47,0.14],[0.3,-0.47,0.14]]) {
+            const leg = new THREE.Mesh(PIG_LEG, PIG_MAT);
+            leg.position.set(lx, ly, lz); pig.add(leg);
+        }
+        // Позиция спавна — детерминированная
+        const px = (pigRng(i, 10) - 0.5) * 100;
+        const pz = (pigRng(i, 11) - 0.5) * 100;
+        const surfY = Math.max(terrainHeight(px, pz), WATER_LEVEL + 1);
+        pig.userData = {
+            pigIdx: i,
+            px, pz, py: (surfY + 0.5) + PIG_FOOT_OFFSET,
+            velY: 0, onGround: true,
+            speed: 0.018 + pigRng(i, 12) * 0.008,
+            turnPeriodSec: 1 + pigRng(i, 13) * 3, // 1-4 сек между поворотами
+            legPhase: 0
+        };
+        scene.add(pig);
+        pigGroup.push(pig);
     }
-    let px, pz;
-    do { px = (Math.random()-0.5)*100; pz = (Math.random()-0.5)*100; }
-    while (inLake(px, pz) || inSand(px, pz));
-    const surfY = Math.max(terrainHeight(px, pz), WATER_LEVEL + 1);
-    pig.userData = { px, pz, py: (surfY+0.5)+PIG_FOOT_OFFSET, velY:0, onGround:true,
-        dir: Math.random()*Math.PI*2, speed: 0.018+Math.random()*0.008,
-        turnTimer: Math.random()*120, wobble: Math.random()*100, legPhase: 0 };
-    scene.add(pig);
-    pigGroup.push(pig);
 }
 
 // ─── МЫШИ ────────────────────────────────────────────────────────────────────
@@ -2143,16 +2260,11 @@ function checkGround() {
 function checkInWater() { return isWaterAt(Math.round(pos.x), Math.round(feetY() + 0.3), Math.round(pos.z)); }
 function checkInLava()  { return isLavaAt(Math.round(pos.x),  Math.round(feetY() + 0.3), Math.round(pos.z)); }
 
-function tryMoveAxis(axis, delta) {
-    if (delta === 0) return;
-    const sign = Math.sign(delta);
-    const nx = pos.x + (axis === "x" ? delta : 0);
-    const nz = pos.z + (axis === "z" ? delta : 0);
-    const fy = feetY();
-    for (const h of [0.1, 0.9, 1.6]) {
+function _isBlockedAt(axis, sign, nx, nz, fy, heights) {
+    for (const h of heights) {
         const by = Math.round(fy + h);
         const perp = PLAYER_R - 0.02;
-        let blocked = false;
+        let blocked;
         if (axis === "x") {
             const checkX = Math.round(nx + sign * PLAYER_R);
             blocked = isSolid(checkX, by, Math.round(nz - perp)) || isSolid(checkX, by, Math.round(nz + perp));
@@ -2160,9 +2272,41 @@ function tryMoveAxis(axis, delta) {
             const checkZ = Math.round(nz + sign * PLAYER_R);
             blocked = isSolid(Math.round(nx - perp), by, checkZ) || isSolid(Math.round(nx + perp), by, checkZ);
         }
-        if (blocked) return;
+        if (blocked) return h;
     }
-    if (axis === "x") pos.x = nx; else pos.z = nz;
+    return -1;
+}
+
+function tryMoveAxis(axis, delta) {
+    if (delta === 0) return;
+    const sign = Math.sign(delta);
+    const nx = pos.x + (axis === "x" ? delta : 0);
+    const nz = pos.z + (axis === "z" ? delta : 0);
+    const fy = feetY();
+    const heights = PLAYER_H >= 1.5 ? [0.1, 0.9, 1.6] : [0.1, 0.6];
+    const blockedH = _isBlockedAt(axis, sign, nx, nz, fy, heights);
+
+    if (blockedH < 0) {
+        if (axis === "x") pos.x = nx; else pos.z = nz;
+        return;
+    }
+
+    // Auto step-up: если уперлись только в нижний блок и стоим на земле — поднимаемся на 1 блок
+    if (blockedH === 0.1 && onGround && velY <= 0) {
+        const stepFy = fy + 1.0;
+        const stillBlocked = _isBlockedAt(axis, sign, nx, nz, stepFy, heights);
+        if (stillBlocked < 0) {
+            // Над головой тоже должно быть свободно
+            const headBy = Math.round(stepFy + PLAYER_H - 0.1);
+            if (!isSolid(Math.round(pos.x), headBy, Math.round(pos.z))) {
+                pos.y += 1.0;
+                // Замедление при подъёме — двигаемся только на 60% от delta
+                if (axis === "x") pos.x = pos.x + delta * 0.6;
+                else               pos.z = pos.z + delta * 0.6;
+                return;
+            }
+        }
+    }
 }
 
 function physicsTick() {
@@ -2303,10 +2447,12 @@ function updatePigs(simTime) {
         pig.visible = true;
         const skipUpdate = lod === "mid" && (simTime * 60 | 0) % 4 !== 0;
         if (!skipUpdate) {
-            d.turnTimer--;
-            if (d.turnTimer <= 0) { d.dir += (Math.random()-0.5)*Math.PI*0.8; d.turnTimer = 60+Math.random()*180; }
-            const nx = d.px + Math.sin(d.dir)*d.speed, nz = d.pz + Math.cos(d.dir)*d.speed;
-            if (!inLake(nx, nz)) { d.px = nx; d.pz = nz; } else d.dir += Math.PI*0.5;
+            // Детерминированный поворот: epoch зависит от dayTime и pigIdx
+            const currentSec = dayTime * DAY_DURATION;
+            const epoch = Math.floor(currentSec / d.turnPeriodSec);
+            const dir = pigRng(d.pigIdx, epoch + 100) * Math.PI * 2;
+            const nx = d.px + Math.sin(dir)*d.speed, nz = d.pz + Math.cos(dir)*d.speed;
+            d.px = nx; d.pz = nz; d.dir = dir;
             if (!d.onGround) d.velY -= GRAVITY;
             d.py += d.velY;
             const pigFeetY = d.py - PIG_FOOT_OFFSET;
@@ -2384,10 +2530,11 @@ function doBreak() {
     currentHit = null;
     // Трекинг дельты
     if (userPlaced.has(k)) {
-        userPlaced.delete(k);          // убрал свой же блок — просто стираем
+        userPlaced.delete(k);
     } else if (worldGenKeys.has(k)) {
-        userRemoved.add(k);            // снёс мировой блок
+        userRemoved.add(k);
     }
+    mpSendBlock("remove", broken.x, broken.y, broken.z);
 }
 
 function doPlace() {
@@ -2411,12 +2558,11 @@ function doPlace() {
         addBlock._lastFail = null;
         addBlock(bx, by, bz, selected);
         if (selected === "aquarium") spawnAquariumFish(bx, by, bz);
-        if (addBlock._lastFail) hudEl._dbg = `addBlock fail: ${addBlock._lastFail}`;
-        else {
-            // Трекинг дельты — фиксируем поставленный блок
+        if (!addBlock._lastFail) {
             const pk = bkey(bx, by, bz);
             userPlaced.set(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
-            userRemoved.delete(pk); // если ставим туда где сносили — убираем из removed
+            userRemoved.delete(pk);
+            mpSendBlock("place", bx, by, bz, selected);
         }
     }
     flushColors();
@@ -2986,12 +3132,10 @@ const profilerEl = document.getElementById("profiler");
 let profilerOn = false;
 document.addEventListener("keydown", e => {
     if (e.code === "F3") { e.preventDefault(); profilerOn = !profilerOn; profilerEl.style.display = profilerOn ? "block" : "none"; }
-    if (e.code === "KeyS" && !e.ctrlKey && !e.metaKey && document.pointerLockElement === renderer.domElement) {
+    if (e.code === "KeyS" && !e.ctrlKey && !e.metaKey && !isMultiplayer && document.pointerLockElement === renderer.domElement) {
         e.preventDefault(); saveWorld();
     }
 });
-
-saveBtn.addEventListener("click", () => saveWorld());
 
 // Скользящее среднее за ~60 кадров для каждой секции
 const PROF_ALPHA = 0.05; // EMA: 0.05 ≈ среднее за ~20 кадров
@@ -2999,6 +3143,409 @@ const profStats = {};
 function profMark(name, ms) {
     if (!profStats[name]) profStats[name] = ms;
     profStats[name] = profStats[name] * (1 - PROF_ALPHA) + ms * PROF_ALPHA;
+}
+
+// ─── МУЛЬТИПЛЕЕР ─────────────────────────────────────────────────────────────
+
+let   ws            = null;
+let   myNetId       = null;
+let   mpConnected   = false;
+let   isMultiplayer = false; // true когда игра запущена в режиме мультиплеера
+const otherPlayers  = new Map(); // id → { group, tx,ty,tz, tYaw, cx,cy,cz, cYaw, catLife }
+const MP_INTERVAL   = 100;       // мс между отправками позиции
+let   _mpLastSend   = 0;
+
+// ── Геометрии и материалы моделей игроков ────────────────────────────────────
+const _mpHeadGeo     = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+const _mpBodyGeo     = new THREE.BoxGeometry(0.60, 0.65, 0.30);
+const _mpArmGeo      = new THREE.BoxGeometry(0.22, 0.55, 0.22);
+const _mpLegGeo      = new THREE.BoxGeometry(0.26, 0.55, 0.26);
+const _mpEyeGeo      = new THREE.BoxGeometry(0.11, 0.09, 0.04);
+const _mpHairTopGeo  = new THREE.BoxGeometry(0.58, 0.14, 0.58);
+const _mpHairBackGeo = new THREE.BoxGeometry(0.54, 0.24, 0.08);
+const _mpMouthGeo    = new THREE.BoxGeometry(0.16, 0.055, 0.04);
+const _mpCatEarGeo   = new THREE.BoxGeometry(0.11, 0.14, 0.06);
+const _mpCatLegSGeo  = new THREE.BoxGeometry(0.12, 0.22, 0.12);
+
+const _mpSkinMat      = new THREE.MeshLambertMaterial({ color: 0xffcc88 });
+const _mpShirtMat     = new THREE.MeshLambertMaterial({ color: 0x4477cc });
+const _mpPantsMat     = new THREE.MeshLambertMaterial({ color: 0x334466 });
+const _mpEyeMat       = new THREE.MeshLambertMaterial({ color: 0x1a0a00 });
+const _mpEyeWhiteMat  = new THREE.MeshLambertMaterial({ color: 0xffffff });
+const _mpEyePupilMat  = new THREE.MeshLambertMaterial({ color: 0x9a6a3a }); // светло-карий
+const _mpMouthMat     = new THREE.MeshLambertMaterial({ color: 0xd48870 }); // близко к коже, чуть темнее и розоватее
+const _mpHairMat      = new THREE.MeshLambertMaterial({ color: 0x3d2200 });
+const _mpCatBlackMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+const _mpCatNoseMat   = new THREE.MeshLambertMaterial({ color: 0xff8fa0 });
+const _mpCatEyeMat    = new THREE.MeshLambertMaterial({ color: 0xffee00 });
+const _mpCatEarInMat  = new THREE.MeshLambertMaterial({ color: 0xff9999 });
+const _mpCatWhiskMat  = new THREE.MeshLambertMaterial({ color: 0xffffff });
+
+function _mpCreateMesh(isCat) {
+    const group = new THREE.Group();
+    let armL = null, armR = null, legL = null, legR = null;
+
+    if (isCat) {
+        const bk = _mpCatBlackMat;
+
+        // Туловище — горизонтальное, длинное, низкое
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.26, 0.70), bk);
+        body.position.set(0, 0.33, 0);
+
+        // Шея — соединяет туловище с головой
+        const neck = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.20, 0.18), bk);
+        neck.position.set(0, 0.44, 0.38);
+
+        // Голова — спереди, чуть поднята
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.36, 0.38), bk);
+        head.position.set(0, 0.54, 0.55);
+
+        // Уши
+        const earGeo = new THREE.BoxGeometry(0.10, 0.17, 0.05);
+        const earL = new THREE.Mesh(earGeo, bk);
+        earL.position.set(-0.13, 0.80, 0.55); earL.rotation.z = 0.20;
+        const earR = new THREE.Mesh(earGeo, bk);
+        earR.position.set(0.13, 0.80, 0.55); earR.rotation.z = -0.20;
+
+        // Внутренность ушей
+        const earInGeo = new THREE.BoxGeometry(0.05, 0.09, 0.02);
+        const earInL = new THREE.Mesh(earInGeo, _mpCatEarInMat);
+        earInL.position.set(-0.13, 0.79, 0.58); earInL.rotation.z = 0.20;
+        const earInR = new THREE.Mesh(earInGeo, _mpCatEarInMat);
+        earInR.position.set(0.13, 0.79, 0.58); earInR.rotation.z = -0.20;
+
+        // Глаза — жёлтые
+        const catEyeGeo = new THREE.BoxGeometry(0.08, 0.07, 0.03);
+        const eyeL = new THREE.Mesh(catEyeGeo, _mpCatEyeMat);
+        eyeL.position.set(-0.10, 0.57, 0.75);
+        const eyeR = new THREE.Mesh(catEyeGeo, _mpCatEyeMat);
+        eyeR.position.set(0.10, 0.57, 0.75);
+
+        // Зрачки — тёмные вертикальные щели
+        const pupilGeo = new THREE.BoxGeometry(0.03, 0.07, 0.02);
+        const pupilL = new THREE.Mesh(pupilGeo, _mpEyeMat);
+        pupilL.position.set(-0.10, 0.57, 0.765);
+        const pupilR = new THREE.Mesh(pupilGeo, _mpEyeMat);
+        pupilR.position.set(0.10, 0.57, 0.765);
+
+        // Нос
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.03), _mpCatNoseMat);
+        nose.position.set(0, 0.50, 0.75);
+
+        // Усы
+        const wGeo = new THREE.BoxGeometry(0.22, 0.014, 0.014);
+        const wL1 = new THREE.Mesh(wGeo, _mpCatWhiskMat); wL1.position.set(-0.24, 0.52, 0.74);
+        const wL2 = new THREE.Mesh(wGeo, _mpCatWhiskMat); wL2.position.set(-0.24, 0.49, 0.74);
+        const wR1 = new THREE.Mesh(wGeo, _mpCatWhiskMat); wR1.position.set(0.24, 0.52, 0.74);
+        const wR2 = new THREE.Mesh(wGeo, _mpCatWhiskMat); wR2.position.set(0.24, 0.49, 0.74);
+
+        // Рот
+        const catMouth = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.035, 0.025), _mpMouthMat);
+        catMouth.position.set(0, 0.45, 0.75);
+
+        // Хвост — два сегмента: основание назад, кончик вверх
+        const tailBase = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.34), bk);
+        tailBase.position.set(0, 0.40, -0.50);
+        tailBase.rotation.x = -0.45;
+        const tailTip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.30, 0.08), bk);
+        tailTip.position.set(0, 0.63, -0.66);
+
+        // 4 лапы — Group с pivot у бедра для анимации ходьбы
+        const legGeo = new THREE.BoxGeometry(0.12, 0.26, 0.13);
+        const catLegM = () => { const m = new THREE.Mesh(legGeo, bk); m.position.y = -0.13; return m; };
+        // fl = передняя левая, fr = передняя правая (legL/legR)
+        // bl = задняя левая,   br = задняя правая  (armL/armR, используем те же слоты)
+        armL = new THREE.Group(); armL.position.set(-0.14, 0.26, 0.26); armL.add(catLegM());
+        armR = new THREE.Group(); armR.position.set( 0.14, 0.26, 0.26); armR.add(catLegM());
+        legL = new THREE.Group(); legL.position.set(-0.14, 0.26, -0.22); legL.add(catLegM());
+        legR = new THREE.Group(); legR.position.set( 0.14, 0.26, -0.22); legR.add(catLegM());
+
+        group.add(body, neck, head, earL, earR, earInL, earInR,
+                  eyeL, eyeR, pupilL, pupilR, nose, wL1, wL2, wR1, wR2,
+                  catMouth, tailBase, tailTip, armL, armR, legL, legR);
+    } else {
+        const hm = _mpSkinMat, bm = _mpShirtMat, lm = _mpPantsMat;
+
+        // Голова
+        const head = new THREE.Mesh(_mpHeadGeo, hm);
+        head.position.y = 1.475;
+
+        // Глаза: квадратная белая склера + квадратный карий зрачок поверх
+        const eyeWhiteGeo = new THREE.BoxGeometry(0.13, 0.11, 0.03);
+        const eyePupilGeo = new THREE.BoxGeometry(0.04, 0.05, 0.03);
+        const eyeWL = new THREE.Mesh(eyeWhiteGeo, _mpEyeWhiteMat);
+        eyeWL.position.set(-0.13, 1.505, 0.276);
+        const eyeWR = new THREE.Mesh(eyeWhiteGeo, _mpEyeWhiteMat);
+        eyeWR.position.set(0.13, 1.505, 0.276);
+        const eyeL = new THREE.Mesh(eyePupilGeo, _mpEyePupilMat);
+        eyeL.position.set(-0.13, 1.505, 0.279);
+        const eyeR = new THREE.Mesh(eyePupilGeo, _mpEyePupilMat);
+        eyeR.position.set(0.13, 1.505, 0.279);
+
+        // Волосы — шапка сверху + свисающий слой сзади (Minecraft-стиль)
+        const hairTop = new THREE.Mesh(_mpHairTopGeo, _mpHairMat);
+        hairTop.position.set(0, 1.73, 0);
+        const hairBack = new THREE.Mesh(_mpHairBackGeo, _mpHairMat);
+        hairBack.position.set(0, 1.595, -0.315);
+
+        // Рот
+        const mouth = new THREE.Mesh(_mpMouthGeo, _mpMouthMat);
+        mouth.position.set(0, 1.32, 0.278);
+
+        // Тело
+        const body = new THREE.Mesh(_mpBodyGeo, bm);
+        body.position.y = 0.875;
+
+        // Левая рука — pivot у плеча
+        armL = new THREE.Group();
+        armL.position.set(-0.41, 1.18, 0);
+        const armLM = new THREE.Mesh(_mpArmGeo, hm);
+        armLM.position.y = -0.275;
+        armL.add(armLM);
+        // Рукав (майка перекрывает верх руки)
+        const sleeveL = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.13, 0.30), bm);
+        sleeveL.position.y = -0.04;
+        armL.add(sleeveL);
+
+        // Правая рука — pivot у плеча
+        armR = new THREE.Group();
+        armR.position.set(0.41, 1.18, 0);
+        const armRM = new THREE.Mesh(_mpArmGeo, hm);
+        armRM.position.y = -0.275;
+        armR.add(armRM);
+        // Рукав (майка перекрывает верх руки)
+        const sleeveR = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.13, 0.30), bm);
+        sleeveR.position.y = -0.04;
+        armR.add(sleeveR);
+
+        // Левая нога — pivot у бедра
+        legL = new THREE.Group();
+        legL.position.set(-0.14, 0.55, 0);
+        const legLM = new THREE.Mesh(_mpLegGeo, lm);
+        legLM.position.y = -0.275;
+        legL.add(legLM);
+
+        // Правая нога — pivot у бедра
+        legR = new THREE.Group();
+        legR.position.set(0.14, 0.55, 0);
+        const legRM = new THREE.Mesh(_mpLegGeo, lm);
+        legRM.position.y = -0.275;
+        legR.add(legRM);
+
+        group.add(head, eyeWL, eyeWR, eyeL, eyeR, hairTop, hairBack, mouth, body, armL, armR, legL, legR);
+    }
+
+    scene.add(group);
+    return { group, armL, armR, legL, legR };
+}
+
+function _mpApplyPlayer(id, name, isCat, x, y, z, yawVal) {
+    let p = otherPlayers.get(id);
+    if (!p) {
+        const m = _mpCreateMesh(isCat);
+        p = { group: m.group, armL: m.armL, armR: m.armR, legL: m.legL, legR: m.legR,
+              tx: x, ty: y, tz: z, tYaw: yawVal,
+              cx: x, cy: y, cz: z, cYaw: yawVal, catLife: isCat, walkPhase: 0 };
+        otherPlayers.set(id, p);
+    }
+    p.tx = x; p.ty = y; p.tz = z; p.tYaw = yawVal;
+}
+
+function _mpRemovePlayer(id) {
+    const p = otherPlayers.get(id);
+    if (p) { scene.remove(p.group); otherPlayers.delete(id); }
+}
+
+function mpUpdatePlayers(dt) {
+    const alpha = Math.min(1, dt * 12);
+    for (const [, p] of otherPlayers) {
+        const prevX = p.cx, prevZ = p.cz;
+        p.cx += (p.tx - p.cx) * alpha;
+        p.cy += (p.ty - p.cy) * alpha;
+        p.cz += (p.tz - p.cz) * alpha;
+
+        let da = p.tYaw - p.cYaw;
+        if (da > Math.PI)  da -= Math.PI * 2;
+        if (da < -Math.PI) da += Math.PI * 2;
+        p.cYaw += da * alpha;
+
+        // Анимация ходьбы — раскачиваем руки и ноги
+        const speed = dt > 0 ? Math.hypot(p.cx - prevX, p.cz - prevZ) / dt : 0;
+        if (speed > 0.05) {
+            p.walkPhase = (p.walkPhase + dt * (p.catLife ? 12 : 8)) % (Math.PI * 2);
+        } else {
+            p.walkPhase *= 0.80; // плавное затухание
+        }
+        if (p.catLife) {
+            // Диагональный галоп: передняя-левая + задняя-правая синхронны
+            const catSwing = Math.sin(p.walkPhase) * 0.5;
+            if (p.armL) p.armL.rotation.x =  catSwing; // перед-лев
+            if (p.armR) p.armR.rotation.x = -catSwing; // перед-прав
+            if (p.legL) p.legL.rotation.x = -catSwing; // зад-лев
+            if (p.legR) p.legR.rotation.x =  catSwing; // зад-прав
+        } else {
+            const swing = Math.sin(p.walkPhase) * 0.55;
+            if (p.legL) p.legL.rotation.x =  swing;
+            if (p.legR) p.legR.rotation.x = -swing;
+            if (p.armL) p.armL.rotation.x = -swing;
+            if (p.armR) p.armR.rotation.x =  swing;
+        }
+
+        // -0.5 — компенсация: блок BoxGeometry(1,1,1) центрирован, верх блока y=15 на 15.5,
+        // а физика возвращает feetY = by+1 = 16 (отсчёт от низа блока).
+        p.group.position.set(p.cx, p.cy - 0.5, p.cz);
+        p.group.rotation.y = p.cYaw + Math.PI;
+    }
+}
+
+function mpSendMove(now) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!myNetId) return; // ждём init — pos ещё не инициализирован
+    if (now - _mpLastSend < MP_INTERVAL) return;
+    _mpLastSend = now;
+    const mpName = localStorage.getItem("mishaCraft_playerName") || "Player";
+    ws.send(JSON.stringify({ type: "move", x: pos.x, y: feetY(), z: pos.z, yaw, pitch, name: mpName, catLife }));
+}
+
+function mpSendBlock(action, x, y, z, blockType) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "block", action, x, y, z, blockType: blockType || "" }));
+}
+
+let _mpReconnectTimer = null;
+let _mpIntentional = false; // true когда закрываем сами (без переподключения)
+
+function connectMultiplayer(serverUrl, playerName) {
+    _mpIntentional = false;
+    if (ws) { _mpIntentional = true; ws.close(); ws = null; _mpIntentional = false; }
+    if (!serverUrl) return;
+
+    try { ws = new WebSocket(serverUrl); }
+    catch(e) { console.warn("MP: неверный URL", e); return; }
+
+    ws.onopen = () => {
+        mpConnected = true;
+        clearTimeout(_mpReconnectTimer);
+        ws.send(JSON.stringify({ type: "join", name: playerName || "Player", catLife }));
+    };
+
+    ws.onclose = () => {
+        mpConnected = false;
+        myNetId = null;
+        for (const [id] of otherPlayers) _mpRemovePlayer(id);
+        if (_mpIntentional) return;
+        showToast(t("mpDisconnected"), "#fa0", 3000);
+        console.log("MP: отключён, переподключаемся через 3с");
+        _mpReconnectTimer = setTimeout(() => {
+            connectMultiplayer(serverUrl, playerName);
+            // После успешного подключения onopen покажет тост
+            const prevOnopen = ws?.onopen;
+            if (ws) ws.onopen = () => {
+                if (prevOnopen) prevOnopen();
+                showToast(t("mpReconnected"), "#4c4", 2500);
+            };
+        }, 3000);
+    };
+
+    ws.onerror = () => { if (!mpConnected) showToast(t("mpUnavailable", serverUrl), "#f44", 4000); };
+
+    ws.onmessage = ({ data }) => {
+        let msg;
+        try { msg = JSON.parse(data); } catch { return; }
+
+        switch (msg.type) {
+            case "init":
+                myNetId = msg.id;
+                if (msg.players) {
+                    for (const p of msg.players) {
+                        _mpApplyPlayer(p.id, p.name, p.catLife, p.x, p.y, p.z, p.yaw);
+                    }
+                }
+                // Инициализируем мир серверным seed
+                if (msg.seed) { initWorldSeed(msg.seed); spawnPigs(); }
+                if (msg.worldTime != null) anchorDayTime(msg.worldTime);
+                if (msg.delta) loadWorldDelta(msg.delta);
+                // Позиция: серверная (повторный вход) или спавн
+                if (msg.spawnPos) {
+                    const sp = msg.spawnPos;
+                    // sp.y — высота ног (feetY), добавляем PLAYER_H чтобы получить pos.y (высоту камеры)
+                    const spCamY = sp.y + PLAYER_H;
+                    pos.set(sp.x, spCamY, sp.z);
+                    posPrev.set(sp.x, spCamY, sp.z);
+                    camera.position.set(sp.x, spCamY, sp.z);
+                    yaw   = sp.yaw   ?? 0;
+                    pitch = sp.pitch ?? 0;
+                    scheduleChunks(sp.x, sp.z, true);
+                    // Ждём генерации чанка игрока перед стартом физики
+                    const playerCK = chunkKey(
+                        Math.floor(sp.x / CHUNK_SIZE),
+                        Math.floor(sp.z / CHUNK_SIZE)
+                    );
+                    const waitForChunk = setInterval(() => {
+                        if (loadedChunks.has(playerCK)) {
+                            clearInterval(waitForChunk);
+                            worldGenDone = true;
+                        }
+                    }, 50);
+                } else {
+                    // Ищем точку спавна вне воды
+                    let spawnX = 0, spawnZ = 0;
+                    outer2: for (let r = 0; r <= 20; r++) {
+                        for (let dx = -r; dx <= r; dx++) {
+                            for (let dz = -r; dz <= r; dz++) {
+                                if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+                                const sx = dx * 3, sz = dz * 3;
+                                if (!inLake(sx, sz) && !inSand(sx, sz)) {
+                                    spawnX = sx; spawnZ = sz; break outer2;
+                                }
+                            }
+                        }
+                    }
+                    const spawnY = Math.max(terrainHeight(spawnX, spawnZ), WATER_LEVEL + 1) + 3;
+                    pos.set(spawnX, spawnY, spawnZ);
+                    posPrev.set(spawnX, spawnY, spawnZ);
+                    camera.position.set(spawnX, spawnY, spawnZ);
+                    scheduleChunks(spawnX, spawnZ, true);
+                    worldGenDone = true;
+                }
+                break;
+
+            case "player_join":
+                _mpApplyPlayer(msg.id, msg.name, msg.catLife,
+                    msg.x || 0, msg.y || 0, msg.z || 0, msg.yaw || 0);
+                break;
+
+            case "player_leave":
+                _mpRemovePlayer(msg.id);
+                break;
+
+            case "player_move":
+                if (msg.id === myNetId) break;
+                {
+                    const _prev = otherPlayers.get(msg.id);
+                    const _x = msg.x ?? _prev?.tx;
+                    const _y = msg.y ?? _prev?.ty;
+                    const _z = msg.z ?? _prev?.tz;
+                    if (_x === undefined || _y === undefined || _z === undefined) break;
+                    _mpApplyPlayer(msg.id, msg.name || "", msg.catLife || false, _x, _y, _z, msg.yaw ?? _prev?.tYaw ?? 0);
+                }
+                break;
+
+            case "block":
+                if (msg.action === "place") {
+                    addBlock(msg.x, msg.y, msg.z, msg.blockType);
+                    flushColors();
+                } else if (msg.action === "remove") {
+                    const entry = blockMap.get(bkey(msg.x, msg.y, msg.z));
+                    if (entry) { removeBlock(entry); flushColors(); }
+                }
+                markChunkDirty(
+                    Math.floor(msg.x / CHUNK_SIZE),
+                    Math.floor(msg.z / CHUNK_SIZE)
+                );
+                break;
+        }
+    };
 }
 
 // ─── ГЛАВНЫЙ ЦИКЛ ────────────────────────────────────────────────────────────
@@ -3017,11 +3564,11 @@ function animate(now) {
     fpsFrames++; fpsAccum += rawDt;
     if (fpsAccum >= 0.5) {
         const fps = Math.round(fpsFrames / fpsAccum);
-        fpsEl.textContent = fps + " FPS";
-        fpsEl.style.color = fps >= 50 ? "#0f0" : fps >= 30 ? "#ff0" : "#f44";
+        fpsEl.textContent = "";
         fpsFrames = 0; fpsAccum = 0;
 
         if (profilerOn) {
+            const profNames = t("profStats") ?? {};
             const order = ["physics","fish","pigs","clouds","buildQueue","torchLight","raycast","render","TOTAL"];
             const lines = order.map(k => {
                 const v = profStats[k];
@@ -3029,22 +3576,38 @@ function animate(now) {
                 const ms = v.toFixed(2);
                 const bar = "█".repeat(Math.min(20, Math.round(v * 4)));
                 const color = v > 8 ? "#f44" : v > 3 ? "#ff0" : "#0f0";
-                return `<span style="color:${color}">${k.padEnd(12)}${ms.padStart(5)}ms ${bar}</span>`;
+                const label = (profNames[k] ?? k).padEnd(12);
+                return `<span style="color:${color}">${label}${ms.padStart(5)}ms ${bar}</span>`;
             }).filter(Boolean);
-            const queueInfo = `<span style="color:#aaa">queue        ${String(buildQueue.length).padStart(5)} чанков</span>`;
-            profilerEl.innerHTML = "<b style='color:#fff'>F3 — профайлер</b><br>" + lines.join("<br>") + "<br>" + queueInfo;
+            const fpsColor = fps >= 50 ? "#0f0" : fps >= 30 ? "#ff0" : "#f44";
+            const fpsLabel = t("profFps").padEnd(12);
+            const fpsLine = `<span style="color:${fpsColor}">${fpsLabel}${String(fps).padStart(5)}</span>`;
+            const queueLabel = t("profQueue").padEnd(12);
+            const queueInfo = `<span style="color:#aaa">${queueLabel}${String(buildQueue.length).padStart(5)}</span>`;
+            const igHours = dayTime * 24;
+            const hh = String(Math.floor(igHours) % 24).padStart(2,"0");
+            const mm = String(Math.floor((igHours % 1) * 60)).padStart(2,"0");
+            const isDay = dayTime > 0.25 && dayTime < 0.75;
+            const timeIcon = isDay ? "☀" : "☾";
+            const timeLabel = t("profTime").padEnd(11);
+            const timeInfo = `<span style="color:#ff9">${timeIcon} ${timeLabel}${hh}:${mm}</span>`;
+            profilerEl.innerHTML = `<b style='color:#fff'>${t("profTitle")}</b><br>` + fpsLine + "<br>" + lines.join("<br>") + "<br>" + queueInfo + "<br>" + timeInfo;
         }
     }
 
     _frameStartMs = performance.now();
     let t0, t1;
 
-    accumTime += dt;
+    if (worldGenDone) {
+        accumTime += dt;
+    } else {
+        accumTime = 0; // сбрасываем накопленное время пока мир не готов
+    }
     posPrev.copy(pos);
     t0 = performance.now();
     // Максимум 5 тиков за кадр — защита от «спирали смерти» после лаг-спайков
     let physIter = 0;
-    while (accumTime >= FIXED_DT && physIter < 5) {
+    while (worldGenDone && accumTime >= FIXED_DT && physIter < 5) {
         physicsTick();
         accumTime -= FIXED_DT;
         simTime   += FIXED_DT;
@@ -3064,8 +3627,7 @@ function animate(now) {
     camera.rotation.x = pitch;
 
     // Координаты + выбранный блок в HUD
-    hudEl.textContent = `X:${Math.round(pos.x)} \u00a0 Y:${Math.round(feetY())} \u00a0 Z:${Math.round(pos.z)}`;
-    if (hudEl._dbg) hudEl.textContent += `\n${hudEl._dbg}`;
+    hudEl.textContent = `x:${Math.round(pos.x)} \u00a0 y:${Math.round(feetY())} \u00a0 z:${Math.round(pos.z)}`;
 
     // Оверлеи + динамический туман
     const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
@@ -3145,6 +3707,10 @@ function animate(now) {
     else      { highlight.visible = false; currentHit = null; }
     if (profilerOn) profMark("raycast", performance.now() - t0);
 
+    // Мультиплеер: интерполяция других игроков + отправка позиции
+    mpUpdatePlayers(dt);
+    mpSendMove(now);
+
     // Рендер
     t0 = performance.now();
     renderer.render(scene, camera);
@@ -3173,40 +3739,121 @@ function sliderToChunks(v) { return Math.round(2 + (15 - 2) * v / 100); }
 // ─── ПЕРЕВОДЫ ────────────────────────────────────────────────────────────────
 const I18N = {
     ru: {
-        newGame:    "🌍 НОВАЯ ИГРА",
-        loadGame:   "💾 ЗАГРУЗИТЬ",
-        checking:   "проверяем сохранение…",
-        hasSave:    "найдено сохранение",
-        noSave:     "сохранений нет",
-        saved:      (n) => `✓ Сохранено (${n} изменений)`,
-        saveErr:    "✗ Ошибка сохранения",
-        loaded:     (n) => `↑ Загружено (${n} изменений)`,
-        saveTip:    "💾",
-        renderDist: "ДАЛЬНОСТЬ ПРОРИСОВКИ",
+        newGame:        "🌍 НОВАЯ ИГРА",
+        loadGame:       "💾 ЗАГРУЗИТЬ",
+        multiBtn:       "🌐 МУЛЬТИПЛЕЕР",
+        settings:       "⚙ НАСТРОЙКИ",
+        settingsTitle:  "⚙ НАСТРОЙКИ",
+        checking:       "проверяем сохранение…",
+        hasSave:        "найдено сохранение",
+        noSave:         "сохранений нет",
+        saved:          (n) => `✓ Сохранено (${n} изменений)`,
+        saveErr:        "✗ Ошибка сохранения",
+        loaded:         (n) => `↑ Загружено (${n} изменений)`,
+        saveTip:        "💾",
+        renderDist:     "ДАЛЬНОСТЬ ПРОРИСОВКИ",
+        graphics:       "ГРАФИКА",
+        catLife:        "🐱 ЖИЗНЬ КОТА",
+        catLifeSub:     "1 блок высотой",
+        budget:         "БЮДЖЕТ КАДРА",
+        budgetSub:      "мс на генерацию чанков",
+        chunkSize:      "РАЗМЕР ЧАНКА",
+        newGameOnly:    "применится при новой игре",
+        cave:           "ПОДЗЕМНЫЙ МИР",
+        close:          "ЗАКРЫТЬ",
+        resume:         "▶ ПРОДОЛЖИТЬ",
+        savePause:      "💾 СОХРАНИТЬ",
+        toMenu:         "⏹ В ГЛАВНОЕ МЕНЮ",
+        pauseTitle:     "ПАУЗА",
+        serverUrl:      "АДРЕС СЕРВЕРА",
+        playerName:     "ИМЯ ИГРОКА",
+        multiplayer:    "МУЛЬТИПЛЕЕР",
+        mpDisconnected: "⚠ Соединение потеряно. Переподключение...",
+        mpReconnected:  "✓ Переподключено!",
+        mpUnavailable:  (url) => `✗ Сервер недоступен: ${url}`,
+        profTitle:      "F3 — профайлер",
+        profFps:        "fps",
+        profQueue:      "очередь",
+        profTime:       "время",
+        profStats: { physics:"физика", fish:"рыбы", pigs:"свиньи", clouds:"облака", buildQueue:"чанки", torchLight:"свет", raycast:"луч", render:"рендер", TOTAL:"ИТОГО" },
     },
     en: {
-        newGame:    "🌍 NEW GAME",
-        loadGame:   "💾 LOAD GAME",
-        checking:   "checking save…",
-        hasSave:    "save found",
-        noSave:     "no saves found",
-        saved:      (n) => `✓ Saved (${n} changes)`,
-        saveErr:    "✗ Save error",
-        loaded:     (n) => `↑ Loaded (${n} changes)`,
-        saveTip:    "💾",
-        renderDist: "RENDER DISTANCE",
+        newGame:        "🌍 NEW GAME",
+        loadGame:       "💾 LOAD GAME",
+        multiBtn:       "🌐 MULTIPLAYER",
+        settings:       "⚙ SETTINGS",
+        settingsTitle:  "⚙ SETTINGS",
+        checking:       "checking save…",
+        hasSave:        "save found",
+        noSave:         "no saves found",
+        saved:          (n) => `✓ Saved (${n} changes)`,
+        saveErr:        "✗ Save error",
+        loaded:         (n) => `↑ Loaded (${n} changes)`,
+        saveTip:        "💾",
+        renderDist:     "RENDER DISTANCE",
+        graphics:       "GRAPHICS",
+        catLife:        "🐱 CAT LIFE",
+        catLifeSub:     "1 block tall",
+        budget:         "FRAME BUDGET",
+        budgetSub:      "ms for chunk generation",
+        chunkSize:      "CHUNK SIZE",
+        newGameOnly:    "applies on new game",
+        cave:           "UNDERGROUND WORLD",
+        close:          "CLOSE",
+        resume:         "▶ RESUME",
+        savePause:      "💾 SAVE",
+        toMenu:         "⏹ MAIN MENU",
+        pauseTitle:     "PAUSED",
+        serverUrl:      "SERVER ADDRESS",
+        playerName:     "PLAYER NAME",
+        multiplayer:    "MULTIPLAYER",
+        mpDisconnected: "⚠ Connection lost. Reconnecting...",
+        mpReconnected:  "✓ Reconnected!",
+        mpUnavailable:  (url) => `✗ Server unavailable: ${url}`,
+        profTitle:      "F3 — profiler",
+        profFps:        "fps",
+        profQueue:      "queue",
+        profTime:       "time",
+        profStats: { physics:"physics", fish:"fish", pigs:"pigs", clouds:"clouds", buildQueue:"chunks", torchLight:"torchLight", raycast:"raycast", render:"render", TOTAL:"TOTAL" },
     },
     de: {
-        newGame:    "🌍 NEUES SPIEL",
-        loadGame:   "💾 LADEN",
-        checking:   "Speicherstand prüfen…",
-        hasSave:    "Speicherstand gefunden",
-        noSave:     "kein Speicherstand",
-        saved:      (n) => `✓ Gespeichert (${n} Änderungen)`,
-        saveErr:    "✗ Speicherfehler",
-        loaded:     (n) => `↑ Geladen (${n} Änderungen)`,
-        saveTip:    "💾",
-        renderDist: "SICHTWEITE",
+        newGame:        "🌍 NEUES SPIEL",
+        loadGame:       "💾 LADEN",
+        multiBtn:       "🌐 MEHRSPIELER",
+        settings:       "⚙ EINSTELLUNGEN",
+        settingsTitle:  "⚙ EINSTELLUNGEN",
+        checking:       "Speicherstand prüfen…",
+        hasSave:        "Speicherstand gefunden",
+        noSave:         "kein Speicherstand",
+        saved:          (n) => `✓ Gespeichert (${n} Änderungen)`,
+        saveErr:        "✗ Speicherfehler",
+        loaded:         (n) => `↑ Geladen (${n} Änderungen)`,
+        saveTip:        "💾",
+        renderDist:     "SICHTWEITE",
+        graphics:       "GRAFIK",
+        catLife:        "🐱 KATZENLEBEN",
+        catLifeSub:     "1 Block groß",
+        budget:         "FRAME-BUDGET",
+        budgetSub:      "ms für Chunk-Generierung",
+        chunkSize:      "CHUNK-GRÖSSE",
+        newGameOnly:    "gilt beim neuen Spiel",
+        cave:           "UNTERWELT",
+        close:          "SCHLIESSEN",
+        resume:         "▶ WEITER",
+        savePause:      "💾 SPEICHERN",
+        toMenu:         "⏹ HAUPTMENÜ",
+        pauseTitle:     "PAUSE",
+        serverUrl:      "SERVERADRESSE",
+        playerName:     "SPIELERNAME",
+        multiplayer:    "MULTIPLAYER",
+        mpDisconnected: "⚠ Verbindung verloren. Verbinde neu...",
+        mpReconnected:  "✓ Neu verbunden!",
+        mpUnavailable:  (url) => `✗ Server nicht erreichbar: ${url}`,
+        profTitle:      "F3 — Profiler",
+        profFps:        "fps",
+        profQueue:      "Warteschlange",
+        profTime:       "Zeit",
+        profStats: { physics:"Physik", fish:"Fische", pigs:"Schweine", clouds:"Wolken", buildQueue:"Chunks", torchLight:"Licht", raycast:"Raycast", render:"Render", TOTAL:"GESAMT" },
     },
 };
 
@@ -3221,8 +3868,31 @@ function t(key, ...args) {
 function applyLang() {
     btnNewGame.textContent  = t("newGame");
     btnLoadGame.textContent = t("loadGame");
-    saveBtn.title = t("saveTip");
-    // hint обновляем только если уже показывает статус сохранения
+    document.getElementById("btn-open-settings").textContent   = t("settings");
+    document.getElementById("btn-multiplayer").textContent      = t("multiBtn");
+    // Пауза
+    document.getElementById("btn-resume").textContent          = t("resume");
+    document.getElementById("btn-save-pause").textContent      = t("savePause");
+    document.getElementById("btn-to-menu").textContent         = t("toMenu");
+    document.querySelector("#pause-panel h2").textContent      = t("pauseTitle");
+    // Настройки — заголовок и лейблы
+    document.getElementById("sp-title").textContent            = t("settingsTitle");
+    document.getElementById("sp-label-graphics").textContent   = t("graphics");
+    document.getElementById("sp-label-cat").firstChild.textContent = t("catLife");
+    document.getElementById("sp-label-cat-sub").textContent    = t("catLifeSub");
+    document.getElementById("sp-label-rd").textContent         = t("renderDist");
+    document.getElementById("sp-label-budget").firstChild.textContent = t("budget");
+    document.getElementById("sp-label-budget-sub").textContent = t("budgetSub");
+    document.getElementById("sp-label-cs").firstChild.textContent = t("chunkSize");
+    document.getElementById("sp-label-cs-sub").textContent     = t("newGameOnly");
+    document.getElementById("sp-label-cave").firstChild.textContent = t("cave");
+    document.getElementById("sp-label-cave-sub").textContent   = t("newGameOnly");
+    document.getElementById("btn-settings-close").textContent  = t("close");
+    // Мультиплеер
+    document.getElementById("sp-label-multiplayer").textContent = t("multiplayer");
+    document.getElementById("sp-label-serverurl").textContent  = t("serverUrl");
+    document.getElementById("sp-label-playername").textContent = t("playerName");
+    // hint
     if (menuHint.dataset.state === "hasSave") menuHint.textContent = t("hasSave");
     else if (menuHint.dataset.state === "noSave") menuHint.textContent = t("noSave");
     else menuHint.textContent = t("checking");
@@ -3245,7 +3915,8 @@ function hideSplash() {
     setTimeout(() => { splashEl.style.display = "none"; }, 420);
 }
 
-async function startGame(loadSave) {
+async function startGame(loadSave, withMP = false) {
+    isMultiplayer = withMP;
     RENDER_DIST = sliderToChunks(+spRd.value);
     applyCatLife(); // применяем после создания pigGroup/mouseGroup
     hideSplash();
@@ -3259,14 +3930,19 @@ async function startGame(loadSave) {
             camera.position.set(p.x, p.y, p.z);
             yaw   = p.yaw   ?? 0;
             pitch = p.pitch ?? 0;
-            scheduleChunks(p.x, p.z);
+            scheduleChunks(p.x, p.z, true);
         } else {
-            scheduleChunks(0, 0);
+            scheduleChunks(0, 0, true);
         }
         worldGenDone = true;
         await loadWorldDelta(saved);
+    } else if (withMP) {
+        // Seed и позиция придут от сервера в init — ждём
+        worldGenDone = false;
     } else {
         initWorldSeed(Math.random() * 0xFFFFFFFF | 0);
+        spawnPigs();
+        anchorDayTime(0.28); // утро при старте новой игры
         // Ищем точку спавна вне воды — спираль от (0,0)
         let spawnX = 0, spawnZ = 0;
         outer: for (let r = 0; r <= 20; r++) {
@@ -3284,9 +3960,16 @@ async function startGame(loadSave) {
         pos.set(spawnX, spawnY, spawnZ);
         posPrev.set(spawnX, spawnY, spawnZ);
         camera.position.set(spawnX, spawnY, spawnZ);
-        scheduleChunks(spawnX, spawnZ);
+        scheduleChunks(spawnX, spawnZ, true);
         worldGenDone = true;
     }
+    // Подключаем мультиплеер только если явно выбран
+    if (withMP) {
+        const mpUrl  = (localStorage.getItem("mishaCraft_serverUrl") || "").trim();
+        const mpName = (localStorage.getItem("mishaCraft_playerName") || "Player").trim();
+        if (mpUrl) connectMultiplayer(mpUrl, mpName);
+    }
+
     requestAnimationFrame(animate);
 }
 
@@ -3321,6 +4004,17 @@ async function onReady() {
 
     btnNewGame.addEventListener("click",  () => startGame(false));
     btnLoadGame.addEventListener("click", () => startGame(true));
+    document.getElementById("btn-multiplayer").addEventListener("click", () => {
+        const mpUrl = (localStorage.getItem("mishaCraft_serverUrl") || "").trim();
+        if (mpUrl) {
+            startGame(false, true);
+        } else {
+            // Нет адреса — открыть настройки
+            openSettings();
+            // Скроллим к полю адреса
+            setTimeout(() => document.getElementById("sp-server-url").focus(), 300);
+        }
+    });
 }
 
 window.addEventListener("resize", () => {
