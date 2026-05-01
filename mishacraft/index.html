@@ -288,9 +288,16 @@ body { margin: 0; overflow: hidden; background: #000; }
     background: rgba(12,12,12,0.97);
     border: 1.5px solid rgba(255,255,255,0.18); border-radius: 14px;
     padding: 24px 30px; min-width: 300px;
+    max-height: calc(100vh - 40px); max-width: calc(100vw - 40px);
+    overflow-y: auto; overscroll-behavior: contain;
     font-family: 'Courier New', monospace; color: #fff;
     box-shadow: 0 8px 40px rgba(0,0,0,0.8);
 }
+#settings-panel::-webkit-scrollbar { width: 8px; }
+#settings-panel::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18); border-radius: 4px;
+}
+#settings-panel::-webkit-scrollbar-track { background: transparent; }
 #settings-panel.open { display: block; }
 #settings-panel h2 {
     margin: 0 0 20px; font-size: 15px; letter-spacing: 3px;
@@ -440,9 +447,14 @@ body { margin: 0; overflow: hidden; background: #000; }
 <div id="settings-overlay"></div>
 <div id="settings-panel">
   <h2 id="sp-title">⚙ НАСТРОЙКИ</h2>
+  <div class="scat" id="sp-label-gameplay">ГЕЙМПЛЕЙ</div>
   <div class="srow">
-    <label id="sp-label-cat">🐱 ЖИЗНЬ КОТА<br><span id="sp-label-cat-sub" style="font-size:10px;opacity:.5">1 блок высотой</span></label>
+    <label id="sp-label-cat">🐱 ЖИЗНЬ КОТА</label>
     <input type="checkbox" id="sp-cat">
+  </div>
+  <div class="srow">
+    <label id="sp-label-cave">ПОДЗЕМНЫЙ МИР<br><span id="sp-label-cave-sub" style="font-size:10px;opacity:.5">применится при новой игре</span></label>
+    <input type="checkbox" id="sp-cave" checked>
   </div>
   <div class="scat" id="sp-label-graphics">ГРАФИКА</div>
   <div class="srow">
@@ -451,18 +463,15 @@ body { margin: 0; overflow: hidden; background: #000; }
     <span class="sval" id="sp-rd-val">7</span>
   </div>
   <div class="srow">
-    <label id="sp-label-budget">БЮДЖЕТ КАДРА<br><span id="sp-label-budget-sub" style="font-size:10px;opacity:.5">мс на генерацию чанков</span></label>
-    <input type="range" id="sp-budget" min="1" max="8" step="1" value="3">
-    <span class="sval" id="sp-budget-val">3</span>
-  </div>
-  <div class="srow">
     <label id="sp-label-cs">РАЗМЕР ЧАНКА<br><span id="sp-label-cs-sub" style="font-size:10px;opacity:.5">применится при новой игре</span></label>
     <input type="range" id="sp-cs" min="6" max="16" step="2" value="8">
     <span class="sval" id="sp-cs-val">8</span>
   </div>
+  <div class="scat" id="sp-label-controls">УПРАВЛЕНИЕ</div>
   <div class="srow">
-    <label id="sp-label-cave">ПОДЗЕМНЫЙ МИР<br><span id="sp-label-cave-sub" style="font-size:10px;opacity:.5">применится при новой игре</span></label>
-    <input type="checkbox" id="sp-cave" checked>
+    <label id="sp-label-sens">ЧУВСТВИТЕЛЬНОСТЬ МЫШИ<br><span id="sp-label-sens-sub" style="font-size:10px;opacity:.5">для тачпада ниже, для мыши выше</span></label>
+    <input type="range" id="sp-sens" min="2" max="80" step="1" value="10">
+    <span class="sval" id="sp-sens-val">1.0x</span>
   </div>
   <div class="scat" id="sp-label-multiplayer">МУЛЬТИПЛЕЕР</div>
   <div class="srow" style="flex-direction:column; align-items:stretch; gap:6px;">
@@ -530,7 +539,19 @@ sun.castShadow = false;
 scene.add(sun);
 
 // ─── ДЕНЬ / НОЧЬ ─────────────────────────────────────────────────────────────
-const DAY_DURATION = 600; // секунд на полный цикл (10 минут)
+const DAY_DURATION = 600; // секунд на полный цикл реального времени (10 минут)
+
+// Длительность дня и ночи в ig-часах. Сумма обычно 24, но можно сделать
+// «другую планету» (например 30-часовые сутки), главное чтобы оба значения
+// были положительные. Ночь распределяется симметрично вокруг полуночи:
+// половина перед рассветом, половина после заката.
+const DAY_HOURS   = 16; // светлое время суток (в ig-часах)
+const NIGHT_HOURS = 8;  // тёмное время суток (в ig-часах)
+const CYCLE_HOURS = DAY_HOURS + NIGHT_HOURS;
+
+// Производные константы — момент восхода и заката в шкале dayTime [0..1].
+const SUNRISE_AT = (NIGHT_HOURS / 2) / CYCLE_HOURS; // dayTime когда солнце встаёт
+const SUNSET_AT  = SUNRISE_AT + DAY_HOURS / CYCLE_HOURS; // dayTime когда солнце заходит
 let dayTime = 0.28;       // начинаем с утра (0=полночь, 0.5=полдень)
 let _dayTimeAnchorVal = 0.28;  // значение dayTime в момент anchoring
 let _dayTimeAnchorMs  = Date.now(); // реальное время в момент anchoring
@@ -539,6 +560,22 @@ function anchorDayTime(val) {
     _dayTimeAnchorVal = val;
     _dayTimeAnchorMs  = Date.now();
     dayTime = val;
+}
+
+// Маппинг линейного dayTime [0..1] на положение солнца [0..1]
+// (0=полночь, 0.25=восход, 0.5=полдень, 0.75=закат). Растягивает день
+// и сжимает ночь, сохраняя плавные dawn/dusk-переходы вокруг sh≈0.
+function dayTimeToSunPhase(dt) {
+    if (dt < SUNRISE_AT) {
+        // Ночь до рассвета: [0, SUNRISE_AT] → [0, 0.25]
+        return dt * 0.25 / SUNRISE_AT;
+    } else if (dt < SUNSET_AT) {
+        // День: [SUNRISE_AT, SUNSET_AT] → [0.25, 0.75]
+        return 0.25 + (dt - SUNRISE_AT) * 0.5 / (SUNSET_AT - SUNRISE_AT);
+    } else {
+        // Ночь после заката: [SUNSET_AT, 1] → [0.75, 1.0]
+        return 0.75 + (dt - SUNSET_AT) * 0.25 / (1 - SUNSET_AT);
+    }
 }
 
 // Заранее выделяем цвета (без GC в каждом кадре)
@@ -589,8 +626,10 @@ function updateDayNight(dt) {
     const elapsed = (Date.now() - _dayTimeAnchorMs) / 1000;
     dayTime = (_dayTimeAnchorVal + elapsed / DAY_DURATION) % 1;
 
-    // sunAngle: 0.25=восход, 0.5=полдень, 0.75=закат
-    const sunAngle = (dayTime - 0.25) * Math.PI * 2;
+    // Нелинейный маппинг: день длится дольше ночи. sunAngle всё ещё крутится
+    // на полный круг за цикл, но скорость меняется (днём медленнее, ночью быстрее).
+    const sunPhase = dayTimeToSunPhase(dayTime);
+    const sunAngle = (sunPhase - 0.25) * Math.PI * 2;
     const sh = Math.sin(sunAngle); // -1..1, высота солнца
 
     const SKY_R = 230;
@@ -635,7 +674,7 @@ const BGEO = new THREE.BoxGeometry(1, 1, 1);
 const MAX_INST = 50000;
 const MAX_INST_BY_TYPE = {
     water:     40000,
-    rainbow:   15000,
+    rainbow:   30000,
     aquarium:   5000,
     glass:      5000,
 };
@@ -936,10 +975,12 @@ function buildChunkMesh(cx, cz) {
                     }
                     for (const face of FLOWER_FACES) {
                         const [nx, ny, nz] = face.n;
+                        const dirMult = ny === 1 ? 1.0 : nz !== 0 ? 0.8 : 0.65;
+                        const faceBr = Math.min(1.0, baseBr * dirMult);
                         const base = positions.length / 3;
                         for (const [vx, vy, vz] of face.v) {
                             positions.push(x + ox + vx, y + vy, z + oz + vz);
-                            colors.push(baseBr, baseBr, baseBr);
+                            colors.push(faceBr, faceBr, faceBr);
                             normals.push(nx, ny, nz);
                             const tu = nx !== 0 ? (vz / FW * 0.5 + 0.5) : (vx / FW * 0.5 + 0.5);
                             const tv = vy / FH * 0.5 + 0.5;
@@ -957,10 +998,12 @@ function buildChunkMesh(cx, cz) {
                     for (let fi = 0; fi < CACTUS_FACES.length; fi++) {
                         const face = CACTUS_FACES[fi];
                         const [nx, ny, nz] = face.n;
+                        const dirMult = ny === 1 ? 1.0 : ny === -1 ? 0.5 : nz !== 0 ? 0.8 : 0.65;
+                        const faceBr = Math.min(1.0, baseBr * dirMult);
                         const base = positions.length / 3;
                         for (const [vx, vy, vz] of face.v) {
                             positions.push(x + vx, y + vy, z + vz);
-                            colors.push(baseBr, baseBr, baseBr);
+                            colors.push(faceBr, faceBr, faceBr);
                             normals.push(nx, ny, nz);
                             // UV: top — XZ, боковые — по горизонтали/вертикали грани
                             let tu, tv;
@@ -984,11 +1027,16 @@ function buildChunkMesh(cx, cz) {
                     // Выбираем тайл: top / side / bottom
                     const tile = fi === 0 ? tiles.top : fi === 1 ? tiles.bottom : tiles.side;
 
+                    // Directional shading: разные грани получают разную яркость —
+                    // верхняя светлее, боковые темнее. Даёт объём даже ночью.
+                    const dirMult = ny === 1 ? 1.0 : ny === -1 ? 0.5 : nz !== 0 ? 0.8 : 0.65;
+                    const faceBr = Math.min(1.0, baseBr * dirMult);
+
                     const base = positions.length / 3;
                     for (const [vx, vy, vz] of face.v) {
                         positions.push(x + vx, y + vy, z + vz);
                         // Vertex color = grayscale brightness; текстура даёт цвет
-                        colors.push(baseBr, baseBr, baseBr);
+                        colors.push(faceBr, faceBr, faceBr);
                         normals.push(nx, ny, nz);
                         const [tu, tv] = faceVertUV(fi, vx, vy, vz);
                         const [au, av] = tileUV(tile[0], tile[1], tu, tv);
@@ -1028,7 +1076,7 @@ function markChunkDirty(x, z) {
 }
 
 // Бюджет на всю работу с чанками за один кадр (мс)
-let CHUNK_FRAME_BUDGET_MS = +(localStorage.getItem("mishaCraft_budget") || 3);
+const CHUNK_FRAME_BUDGET_MS = 5;
 let _frameStartMs = 0; // устанавливается в начале animate()
 
 function flushDirtyChunks() {
@@ -1231,11 +1279,13 @@ const btnSettingsClose = document.getElementById("btn-settings-close");
 const spRd             = document.getElementById("sp-rd");
 const spRdVal          = document.getElementById("sp-rd-val");
 const spCat            = document.getElementById("sp-cat");
-const spBudget         = document.getElementById("sp-budget");
-const spBudgetVal      = document.getElementById("sp-budget-val");
 const spCs             = document.getElementById("sp-cs");
 const spCsVal          = document.getElementById("sp-cs-val");
 const spCave           = document.getElementById("sp-cave");
+const spSens           = document.getElementById("sp-sens");
+const spSensVal        = document.getElementById("sp-sens-val");
+
+let mouseSensitivity = 1.0; // множитель к базовой чувствительности 0.002
 
 // Восстанавливаем значения
 const _spRDsaved = localStorage.getItem("mishaCraft_renderDist");
@@ -1243,14 +1293,16 @@ if (_spRDsaved !== null) spRd.value = _spRDsaved;
 spRdVal.textContent = sliderToChunks(+spRd.value);
 spCat.checked = catLife;
 
-spBudget.value = CHUNK_FRAME_BUDGET_MS;
-spBudgetVal.textContent = CHUNK_FRAME_BUDGET_MS;
-
 const _spCSsaved = localStorage.getItem("mishaCraft_chunkSize");
 if (_spCSsaved !== null) spCs.value = _spCSsaved;
 spCsVal.textContent = spCs.value;
 
 spCave.checked = localStorage.getItem("mishaCraft_cave") !== "0";
+
+const _spSensSaved = localStorage.getItem("mishaCraft_mouseSens");
+if (_spSensSaved !== null) spSens.value = _spSensSaved;
+mouseSensitivity = (+spSens.value) / 10;
+spSensVal.textContent = mouseSensitivity.toFixed(1) + "x";
 
 spRd.addEventListener("input", () => {
     const chunks = sliderToChunks(+spRd.value);
@@ -1266,12 +1318,6 @@ spCat.addEventListener("change", () => {
     applyCatLife();
 });
 
-spBudget.addEventListener("input", () => {
-    CHUNK_FRAME_BUDGET_MS = +spBudget.value;
-    spBudgetVal.textContent = CHUNK_FRAME_BUDGET_MS;
-    localStorage.setItem("mishaCraft_budget", CHUNK_FRAME_BUDGET_MS);
-});
-
 spCs.addEventListener("input", () => {
     spCsVal.textContent = spCs.value;
     localStorage.setItem("mishaCraft_chunkSize", spCs.value);
@@ -1279,6 +1325,12 @@ spCs.addEventListener("input", () => {
 
 spCave.addEventListener("change", () => {
     localStorage.setItem("mishaCraft_cave", spCave.checked ? "1" : "0");
+});
+
+spSens.addEventListener("input", () => {
+    mouseSensitivity = (+spSens.value) / 10;
+    spSensVal.textContent = mouseSensitivity.toFixed(1) + "x";
+    localStorage.setItem("mishaCraft_mouseSens", spSens.value);
 });
 
 const spServerUrl   = document.getElementById("sp-server-url");
@@ -1732,10 +1784,10 @@ function generateChunk(cx, cz) {
             // ── Единый подземный слой для всех колонок ───────────────────────
             // y = -15: один слой лавы
             addBlock(x, DEEP_LIMIT, z, "lava");
-            // y = -14 … -6: пусто; случайно 1/15 — радужный блок (если пещера включена)
+            // y = -14 … -6: пусто; случайно 1/50 — радужный блок (если пещера включена)
             if (localStorage.getItem("mishaCraft_cave") !== "0") {
                 for (let y = DEEP_LIMIT + 1; y <= -6; y++) {
-                    if (coordHash(x, y, z) % 15 === 0) addBlock(x, y, z, "rainbow");
+                    if (coordHash(x, y, z) % 50 === 0) addBlock(x, y, z, "rainbow");
                 }
             }
 
@@ -2492,8 +2544,9 @@ let yaw = 0, pitch = 0;
 renderer.domElement.addEventListener("click", () => renderer.domElement.requestPointerLock());
 document.addEventListener("mousemove", e => {
     if (document.pointerLockElement !== renderer.domElement) return;
-    yaw   -= e.movementX * 0.002;
-    pitch -= e.movementY * 0.002;
+    const k = 0.002 * mouseSensitivity;
+    yaw   -= e.movementX * k;
+    pitch -= e.movementY * k;
     pitch  = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
 });
 
@@ -2551,7 +2604,17 @@ function doPlace() {
     if (dx < 0.6 && dz2 < 0.6 && dy > -0.1 && dy < PLAYER_H + 0.2) return;
     if (selected === "rainbow") {
         if (rainbowCrafted <= 0) return;
+        const pk = bkey(bx, by, bz);
+        userRemoved.delete(pk);
+        addBlock._lastFail = null;
         addBlock(bx, by, bz, selected);
+        if (addBlock._lastFail) {
+            if (worldGenKeys.has(pk)) userRemoved.add(pk);
+            return;
+        }
+        userPlaced.set(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
+        mpSendBlock("place", bx, by, bz, selected);
+        rainbowCount--;
         rainbowCrafted--;
         updateRainbowUI();
         if (rainbowCrafted === 0) {
@@ -3005,7 +3068,10 @@ document.querySelectorAll(".slot").forEach((slot) => {
 document.addEventListener("keydown", e => {
     keys[e.code] = true;
     if (e.code === "Space") e.preventDefault();
-    if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
+    if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight") {
+        // Не перехватываем стрелки когда фокус на слайдере или другом input — браузер сам их обработает
+        if (!(document.activeElement instanceof HTMLInputElement)) e.preventDefault();
+    }
     // Цифры
     if (e.code.startsWith("Digit")) {
         const n = parseInt(e.code.replace("Digit","")) - 1;
@@ -3142,9 +3208,6 @@ const profilerEl = document.getElementById("profiler");
 let profilerOn = false;
 document.addEventListener("keydown", e => {
     if (e.code === "F3") { e.preventDefault(); profilerOn = !profilerOn; profilerEl.style.display = profilerOn ? "block" : "none"; }
-    if (e.code === "KeyS" && !e.ctrlKey && !e.metaKey && !isMultiplayer && document.pointerLockElement === renderer.domElement) {
-        e.preventDefault(); saveWorld();
-    }
 });
 
 // Скользящее среднее за ~60 кадров для каждой секции
@@ -3408,6 +3471,83 @@ function mpUpdatePlayers(dt) {
     }
 }
 
+// Стабильный per-устройство UUID игрока. Имя может меняться, этот id — нет.
+// Сервер использует его как ключ для PlayerSpawn и для дедупликации reconnect'ов.
+function getPlayerId() {
+    let id = localStorage.getItem("mishaCraft_playerId");
+    if (!id) {
+        id = (crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem("mishaCraft_playerId", id);
+    }
+    return id;
+}
+
+// Собираем fingerprint устройства/браузера. Пока сервер просто складывает его
+// в world.json — никакой логики поверх не строится. На будущее: анти-абуз,
+// аналитика «с какого устройства этот игрок обычно заходит», и т.п.
+function collectFingerprint() {
+    const safe = (fn) => { try { return fn(); } catch (_) { return null; } };
+    return {
+        userAgent: navigator.userAgent || "",
+        language: navigator.language || "",
+        languages: (navigator.languages || []).join(","),
+        platform: navigator.platform || "",
+        userAgentData: safe(() => navigator.userAgentData ? {
+            platform: navigator.userAgentData.platform,
+            mobile:   navigator.userAgentData.mobile,
+            brands:   navigator.userAgentData.brands,
+        } : null),
+        timezone: safe(() => Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
+        timezoneOffsetMin: -new Date().getTimezoneOffset(),
+        screen: {
+            w: screen.width,
+            h: screen.height,
+            availW: screen.availWidth,
+            availH: screen.availHeight,
+            depth: screen.colorDepth,
+            // Физическое разрешение в пикселях (CSS-px × DPR)
+            physicalW: Math.round(screen.width  * (window.devicePixelRatio || 1)),
+            physicalH: Math.round(screen.height * (window.devicePixelRatio || 1)),
+            orientation: safe(() => screen.orientation ? screen.orientation.type : null),
+        },
+        window: {
+            innerW:  window.innerWidth,
+            innerH:  window.innerHeight,
+            outerW:  window.outerWidth,
+            outerH:  window.outerHeight,
+        },
+        dpr: window.devicePixelRatio || 1,
+        cores: navigator.hardwareConcurrency || 0,
+        memoryGB: navigator.deviceMemory || 0,
+        touchPoints: navigator.maxTouchPoints || 0,
+        webgl: collectWebGLInfo(),
+        connection: safe(() => navigator.connection ? {
+            effectiveType: navigator.connection.effectiveType,
+            downlink:      navigator.connection.downlink,
+            rtt:           navigator.connection.rtt,
+            saveData:      navigator.connection.saveData,
+        } : null),
+        cordova: typeof window.cordova !== "undefined" ? (window.cordova.platformId || "yes") : "",
+        capturedAt: new Date().toISOString(),
+    };
+}
+
+function collectWebGLInfo() {
+    try {
+        const canvas = document.createElement("canvas");
+        const gl = canvas.getContext("webgl2") || canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+        if (!gl) return null;
+        const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+        return {
+            vendor:   dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL)   : gl.getParameter(gl.VENDOR),
+            renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+            version:  gl.getParameter(gl.VERSION),
+        };
+    } catch (_) { return null; }
+}
+
 function mpSendMove(now) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     if (!myNetId) return; // ждём init — pos ещё не инициализирован
@@ -3436,7 +3576,13 @@ function connectMultiplayer(serverUrl, playerName) {
     ws.onopen = () => {
         mpConnected = true;
         clearTimeout(_mpReconnectTimer);
-        ws.send(JSON.stringify({ type: "join", name: playerName || "Player", catLife }));
+        ws.send(JSON.stringify({
+            type: "join",
+            playerId: getPlayerId(),
+            name: playerName || "Player",
+            catLife,
+            fingerprint: collectFingerprint(),
+        }));
     };
 
     ws.onclose = () => {
@@ -3613,7 +3759,7 @@ function animate(now) {
             const igHours = dayTime * 24;
             const hh = String(Math.floor(igHours) % 24).padStart(2,"0");
             const mm = String(Math.floor((igHours % 1) * 60)).padStart(2,"0");
-            const isDay = dayTime > 0.25 && dayTime < 0.75;
+            const isDay = dayTime > SUNRISE_AT && dayTime < SUNSET_AT;
             const timeIcon = isDay ? "☀" : "☾";
             const timeLabel = t("profTime").padEnd(11);
             const timeInfo = `<span style="color:#ff9">${timeIcon} ${timeLabel}${hh}:${mm}</span>`;
@@ -3661,16 +3807,25 @@ function animate(now) {
     const headInLava  = isLavaAt (Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
     underwaterDiv.style.display  = headInWater ? "block" : "none";
     lavaOverlayDiv.style.display = headInLava  ? "block" : "none";
-    // Туман под водой: синий, ближний — имитирует мутную воду
+    // Когда камера внутри воды — прячем водный mesh: иначе видны границы
+    // каждого водного куба (двойная прозрачность на стыках блоков).
+    // Туман + underwater-оверлей дают эффект погружения и без него.
+    iMesh.water.visible = !headInWater;
+    // Туман под водой: синий, ближний — имитирует мутную воду.
+    // Также подменяем scene.background, иначе на горизонте/наверху виден кусок неба
+    // (на background туман в three.js не действует).
     if (headInWater) {
         scene.fog.color.set(0x004488);
-        scene.fog.near = 2; scene.fog.far = 16;
+        scene.fog.near = 4; scene.fog.far = 32;
+        scene.background.set(0x004488);
     } else if (headInLava) {
         scene.fog.color.set(0x330000);
         scene.fog.near = 1; scene.fog.far = 6;
+        scene.background.set(0x330000);
     } else {
         scene.fog.color.copy(_skyColor);
         scene.fog.near = 80; scene.fog.far = 160;
+        scene.background.copy(_skyColor);
     }
     // День / ночь — только когда не под водой/лавой
     if (!headInWater && !headInLava) updateDayNight(dt);
@@ -3780,13 +3935,14 @@ const I18N = {
         saveTip:        "💾",
         renderDist:     "ДАЛЬНОСТЬ ПРОРИСОВКИ",
         graphics:       "ГРАФИКА",
+        gameplay:       "ГЕЙМПЛЕЙ",
         catLife:        "🐱 ЖИЗНЬ КОТА",
-        catLifeSub:     "1 блок высотой",
-        budget:         "БЮДЖЕТ КАДРА",
-        budgetSub:      "мс на генерацию чанков",
         chunkSize:      "РАЗМЕР ЧАНКА",
         newGameOnly:    "применится при новой игре",
         cave:           "ПОДЗЕМНЫЙ МИР",
+        controls:       "УПРАВЛЕНИЕ",
+        mouseSens:      "ЧУВСТВИТЕЛЬНОСТЬ МЫШИ",
+        mouseSensSub:   "для тачпада ниже, для мыши выше",
         close:          "ЗАКРЫТЬ",
         resume:         "▶ ПРОДОЛЖИТЬ",
         savePause:      "💾 СОХРАНИТЬ",
@@ -3819,13 +3975,14 @@ const I18N = {
         saveTip:        "💾",
         renderDist:     "RENDER DISTANCE",
         graphics:       "GRAPHICS",
+        gameplay:       "GAMEPLAY",
         catLife:        "🐱 CAT LIFE",
-        catLifeSub:     "1 block tall",
-        budget:         "FRAME BUDGET",
-        budgetSub:      "ms for chunk generation",
         chunkSize:      "CHUNK SIZE",
         newGameOnly:    "applies on new game",
         cave:           "UNDERGROUND WORLD",
+        controls:       "CONTROLS",
+        mouseSens:      "MOUSE SENSITIVITY",
+        mouseSensSub:   "lower for trackpad, higher for mouse",
         close:          "CLOSE",
         resume:         "▶ RESUME",
         savePause:      "💾 SAVE",
@@ -3858,13 +4015,14 @@ const I18N = {
         saveTip:        "💾",
         renderDist:     "SICHTWEITE",
         graphics:       "GRAFIK",
+        gameplay:       "GAMEPLAY",
         catLife:        "🐱 KATZENLEBEN",
-        catLifeSub:     "1 Block groß",
-        budget:         "FRAME-BUDGET",
-        budgetSub:      "ms für Chunk-Generierung",
         chunkSize:      "CHUNK-GRÖSSE",
         newGameOnly:    "gilt beim neuen Spiel",
         cave:           "UNTERWELT",
+        controls:       "STEUERUNG",
+        mouseSens:      "MAUSEMPFINDLICHKEIT",
+        mouseSensSub:   "niedriger für Touchpad, höher für Maus",
         close:          "SCHLIESSEN",
         resume:         "▶ WEITER",
         savePause:      "💾 SPEICHERN",
@@ -3905,15 +4063,15 @@ function applyLang() {
     // Настройки — заголовок и лейблы
     document.getElementById("sp-title").textContent            = t("settingsTitle");
     document.getElementById("sp-label-graphics").textContent   = t("graphics");
-    document.getElementById("sp-label-cat").firstChild.textContent = t("catLife");
-    document.getElementById("sp-label-cat-sub").textContent    = t("catLifeSub");
+    document.getElementById("sp-label-cat").textContent = t("catLife");
     document.getElementById("sp-label-rd").textContent         = t("renderDist");
-    document.getElementById("sp-label-budget").firstChild.textContent = t("budget");
-    document.getElementById("sp-label-budget-sub").textContent = t("budgetSub");
     document.getElementById("sp-label-cs").firstChild.textContent = t("chunkSize");
     document.getElementById("sp-label-cs-sub").textContent     = t("newGameOnly");
     document.getElementById("sp-label-cave").firstChild.textContent = t("cave");
     document.getElementById("sp-label-cave-sub").textContent   = t("newGameOnly");
+    document.getElementById("sp-label-controls").textContent   = t("controls");
+    document.getElementById("sp-label-sens").firstChild.textContent = t("mouseSens");
+    document.getElementById("sp-label-sens-sub").textContent   = t("mouseSensSub");
     document.getElementById("btn-settings-close").textContent  = t("close");
     // Мультиплеер
     document.getElementById("sp-label-multiplayer").textContent = t("multiplayer");
