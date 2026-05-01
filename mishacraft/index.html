@@ -1810,8 +1810,9 @@ function generateChunk(cx, cz) {
                 for (let y = -5; y < top; y++) addBlock(x, y, z, "stone");
                 const surfaceType = top >= 18 ? "stone" : "grass";
                 addBlock(x, top, z, surfaceType);
-                // Пустыня: заменяем поверхность песком и добавляем кактусы
-                if (surfaceType === "grass" && isDesert(x, z)) {
+                // Пустыня: заменяем поверхность песком и добавляем кактусы.
+                // Пропускаем если addBlock был отклонён (позиция занята дельтой — блок, поставленный игроком).
+                if (surfaceType === "grass" && isDesert(x, z) && !addBlock._lastFail) {
                     // Убираем верхний блок травы, ставим песок
                     blockMap.delete(`${x},${top},${z}`);
                     addBlock(x, top, z, "sand");
