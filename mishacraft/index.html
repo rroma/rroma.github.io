@@ -414,7 +414,8 @@ body { margin: 0; overflow: hidden; background: #000; }
     <button class="menu-btn load-game" id="btn-load-game" disabled>💾 ЗАГРУЗИТЬ</button>
     <button class="menu-btn multi"     id="btn-multiplayer">🌐 МУЛЬТИПЛЕЕР</button>
     <button class="menu-btn" id="btn-open-settings" style="border-color:rgba(255,255,255,0.3)">⚙ НАСТРОЙКИ</button>
-    <div id="menu-hint">проверяем сохранение…</div>
+    <button class="menu-btn" id="btn-exit" style="border-color:rgba(255,80,80,0.4);color:rgba(255,180,180,0.9)">✕ ВЫЙТИ</button>
+    <div id="menu-hint">проверяем сохранение… </div>
   </div>
 </div>
 
@@ -451,6 +452,10 @@ body { margin: 0; overflow: hidden; background: #000; }
   <div class="srow">
     <label id="sp-label-cat">🐱 ЖИЗНЬ КОТА</label>
     <input type="checkbox" id="sp-cat">
+  </div>
+  <div class="srow">
+    <label id="sp-label-showplayers">👥 ИГРОКИ</label>
+    <input type="checkbox" id="sp-showplayers" checked>
   </div>
   <div class="srow">
     <label id="sp-label-cave">ПОДЗЕМНЫЙ МИР<br><span id="sp-label-cave-sub" style="font-size:10px;opacity:.5">применится при новой игре</span></label>
@@ -1261,6 +1266,7 @@ const saveToast = document.getElementById("save-toast");
 
 // ─── НАСТРОЙКИ ───────────────────────────────────────────────────────────────
 let catLife = localStorage.getItem("mishaCraft_catLife") === "1";
+let showPlayers = localStorage.getItem("mishaCraft_showPlayers") !== "0";
 
 function applyCatLife() {
     PLAYER_H    = catLife ? 1.0 : 1.75;
@@ -1292,6 +1298,8 @@ const _spRDsaved = localStorage.getItem("mishaCraft_renderDist");
 if (_spRDsaved !== null) spRd.value = _spRDsaved;
 spRdVal.textContent = sliderToChunks(+spRd.value);
 spCat.checked = catLife;
+const spShowPlayers = document.getElementById("sp-showplayers");
+spShowPlayers.checked = showPlayers;
 
 const _spCSsaved = localStorage.getItem("mishaCraft_chunkSize");
 if (_spCSsaved !== null) spCs.value = _spCSsaved;
@@ -1316,6 +1324,11 @@ spCat.addEventListener("change", () => {
     catLife = spCat.checked;
     localStorage.setItem("mishaCraft_catLife", catLife ? "1" : "0");
     applyCatLife();
+});
+spShowPlayers.addEventListener("change", () => {
+    showPlayers = spShowPlayers.checked;
+    localStorage.setItem("mishaCraft_showPlayers", showPlayers ? "1" : "0");
+    for (const [, p] of otherPlayers) p.group.visible = showPlayers;
 });
 
 spCs.addEventListener("input", () => {
@@ -1355,6 +1368,7 @@ function closeSettings() {
 
 btnSettings.addEventListener("click", openSettings);
 btnSettingsClose.addEventListener("click", closeSettings);
+document.getElementById("btn-exit").addEventListener("click", () => window.close());
 settingsOverlay.addEventListener("click", closeSettings);
 
 // Пауза
@@ -3419,10 +3433,12 @@ function _mpApplyPlayer(id, name, isCat, x, y, z, yawVal) {
         const m = _mpCreateMesh(isCat);
         p = { group: m.group, armL: m.armL, armR: m.armR, legL: m.legL, legR: m.legR,
               tx: x, ty: y, tz: z, tYaw: yawVal,
-              cx: x, cy: y, cz: z, cYaw: yawVal, catLife: isCat, walkPhase: 0 };
+              cx: x, cy: y, cz: z, cYaw: yawVal, catLife: isCat, walkPhase: 0, name };
         otherPlayers.set(id, p);
+        p.group.visible = showPlayers;
     }
     p.tx = x; p.ty = y; p.tz = z; p.tYaw = yawVal;
+    if (name) p.name = name;
 }
 
 function _mpRemovePlayer(id) {
@@ -3806,8 +3822,15 @@ function animate(now) {
     camera.rotation.y = yaw;
     camera.rotation.x = pitch;
 
-    // Координаты + выбранный блок в HUD
-    hudEl.textContent = `x:${Math.round(pos.x)} \u00a0 y:${Math.round(feetY())} \u00a0 z:${Math.round(pos.z)}`;
+    // Координаты + список игроков в HUD
+    let hudText = `x:${Math.round(pos.x)} \u00a0 y:${Math.round(feetY())} \u00a0 z:${Math.round(pos.z)}`;
+    if (showPlayers && otherPlayers.size > 0) {
+        for (const [, p] of otherPlayers) {
+            const pname = p.name || "?";
+            hudText += `\n${pname}: ${Math.round(p.cx)},${Math.round(p.cy)},${Math.round(p.cz)}`;
+        }
+    }
+    hudEl.textContent = hudText;
 
     // Оверлеи + динамический туман
     const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
@@ -3932,6 +3955,7 @@ const I18N = {
         loadGame:       "💾 ЗАГРУЗИТЬ",
         multiBtn:       "🌐 МУЛЬТИПЛЕЕР",
         settings:       "⚙ НАСТРОЙКИ",
+        exit:           "✕ ВЫЙТИ",
         settingsTitle:  "⚙ НАСТРОЙКИ",
         checking:       "проверяем сохранение…",
         hasSave:        "найдено сохранение",
@@ -3944,6 +3968,7 @@ const I18N = {
         graphics:       "ГРАФИКА",
         gameplay:       "ГЕЙМПЛЕЙ",
         catLife:        "🐱 ЖИЗНЬ КОТА",
+        showPlayers:    "👥 ИГРОКИ",
         chunkSize:      "РАЗМЕР ЧАНКА",
         newGameOnly:    "применится при новой игре",
         cave:           "ПОДЗЕМНЫЙ МИР",
@@ -3972,6 +3997,7 @@ const I18N = {
         loadGame:       "💾 LOAD GAME",
         multiBtn:       "🌐 MULTIPLAYER",
         settings:       "⚙ SETTINGS",
+        exit:           "✕ EXIT",
         settingsTitle:  "⚙ SETTINGS",
         checking:       "checking save…",
         hasSave:        "save found",
@@ -3984,6 +4010,7 @@ const I18N = {
         graphics:       "GRAPHICS",
         gameplay:       "GAMEPLAY",
         catLife:        "🐱 CAT LIFE",
+        showPlayers:    "👥 PLAYERS",
         chunkSize:      "CHUNK SIZE",
         newGameOnly:    "applies on new game",
         cave:           "UNDERGROUND WORLD",
@@ -4012,6 +4039,7 @@ const I18N = {
         loadGame:       "💾 LADEN",
         multiBtn:       "🌐 MEHRSPIELER",
         settings:       "⚙ EINSTELLUNGEN",
+        exit:           "✕ BEENDEN",
         settingsTitle:  "⚙ EINSTELLUNGEN",
         checking:       "Speicherstand prüfen…",
         hasSave:        "Speicherstand gefunden",
@@ -4024,6 +4052,7 @@ const I18N = {
         graphics:       "GRAFIK",
         gameplay:       "GAMEPLAY",
         catLife:        "🐱 KATZENLEBEN",
+        showPlayers:    "👥 SPIELER",
         chunkSize:      "CHUNK-GRÖSSE",
         newGameOnly:    "gilt beim neuen Spiel",
         cave:           "UNTERWELT",
@@ -4061,6 +4090,7 @@ function applyLang() {
     btnNewGame.textContent  = t("newGame");
     btnLoadGame.textContent = t("loadGame");
     document.getElementById("btn-open-settings").textContent   = t("settings");
+    document.getElementById("btn-exit").textContent             = t("exit");
     document.getElementById("btn-multiplayer").textContent      = t("multiBtn");
     // Пауза
     document.getElementById("btn-resume").textContent          = t("resume");
@@ -4071,6 +4101,7 @@ function applyLang() {
     document.getElementById("sp-title").textContent            = t("settingsTitle");
     document.getElementById("sp-label-graphics").textContent   = t("graphics");
     document.getElementById("sp-label-cat").textContent = t("catLife");
+    document.getElementById("sp-label-showplayers").textContent = t("showPlayers");
     document.getElementById("sp-label-rd").textContent         = t("renderDist");
     document.getElementById("sp-label-cs").firstChild.textContent = t("chunkSize");
     document.getElementById("sp-label-cs-sub").textContent     = t("newGameOnly");
