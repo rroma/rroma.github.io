@@ -50,7 +50,7 @@ body { margin: 0; overflow: hidden; background: #000; }
         padding: 9px 24px; width: 200px;
         border-radius: 8px;
     }
-    #splash-menu { gap: 10px; margin-top: 20px; }
+    #splash-menu { gap: 8px; margin-top: 10px; }
 }
 .menu-btn:hover  { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.5); transform: translateY(-2px); }
 .menu-btn:active { transform: translateY(0); }
@@ -120,9 +120,11 @@ body { margin: 0; overflow: hidden; background: #000; }
 
 #hud {
     position: fixed; top: 10px; left: 10px;
-    color: #fff; font-family: monospace; font-size: 13px;
+    font-family: monospace; font-size: 13px;
     text-shadow: 1px 1px 3px #000; pointer-events: none; line-height: 1.7;
 }
+#hud-coords { color: #fff; font-weight: bold; }
+#hud-players { color: #0f0; font-size: 11px; line-height: 1.5; margin-top: 1px; }
 #fps {
     position: fixed; top: 10px; right: 14px;
     color: #0f0; font-family: monospace; font-size: 15px; font-weight: bold;
@@ -431,7 +433,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 <div id="crosshair"></div>
 <div id="underwater"></div>
 <div id="lava-overlay"></div>
-<div id="hud">x: 0 &nbsp; y: 0 &nbsp; z: 0</div>
+<div id="hud"><span id="hud-coords">X:0 &nbsp; Y:0 &nbsp; Z:0</span><div id="hud-players"></div></div>
 <div id="fps">-- FPS</div>
 <div id="profiler" style="
     position:fixed; top:10px; right:90px;
@@ -3229,6 +3231,8 @@ const _origPhysicsTick = physicsTick;
 
 const fpsEl = document.getElementById("fps");
 const hudEl = document.getElementById("hud");
+const hudCoords  = document.getElementById("hud-coords");
+const hudPlayers = document.getElementById("hud-players");
 let fpsFrames = 0, fpsAccum = 0;
 
 // ─── ПРОФАЙЛЕР ───────────────────────────────────────────────────────────────
@@ -3836,14 +3840,17 @@ function animate(now) {
     camera.rotation.x = pitch;
 
     // Координаты + список игроков в HUD
-    let hudText = `x:${Math.round(pos.x)} \u00a0 y:${Math.round(feetY())} \u00a0 z:${Math.round(pos.z)}`;
+    hudCoords.textContent = `X:${Math.round(pos.x)} \u00a0 Y:${Math.round(feetY())} \u00a0 Z:${Math.round(pos.z)}`;
     if (showPlayers && otherPlayers.size > 0) {
+        let lines = "";
         for (const [, p] of otherPlayers) {
             const pname = p.name || "?";
-            hudText += `\n${pname}: ${Math.round(p.cx)},${Math.round(p.cy)},${Math.round(p.cz)}`;
+            lines += `${pname}: ${Math.round(p.cx)},${Math.round(p.cy)},${Math.round(p.cz)}\n`;
         }
+        hudPlayers.textContent = lines.trimEnd();
+    } else {
+        hudPlayers.textContent = "";
     }
-    hudEl.textContent = hudText;
 
     // Оверлеи + динамический туман
     const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
@@ -4259,10 +4266,12 @@ window.addEventListener("resize", () => {
     renderer.setSize(innerWidth, innerHeight);
 });
 
-const IS_CORDOVA = typeof window.cordova !== "undefined";
+const IS_CORDOVA = typeof window.cordova !== "undefined" || typeof window.PhoneGap !== "undefined";
 if (IS_CORDOVA) {
-    btnExit.style.display = "";
-    document.addEventListener("deviceready", onReady, { once: true });
+    document.addEventListener("deviceready", () => {
+        btnExit.style.display = "";
+        onReady();
+    }, { once: true });
 } else {
     onReady();
 }
