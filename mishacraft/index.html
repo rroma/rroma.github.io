@@ -1560,6 +1560,21 @@ async function initWorldFromDB() {
     }
 }
 
+// Шаг 1: регистрируем userPlaced/userRemoved ДО генерации чанков.
+// Это позволяет generateChunk пропустить позиции из дельты и учесть removed.
+function preloadDeltaSets(delta) {
+    if (!delta) return;
+    for (const k of (delta.removed || [])) {
+        userRemoved.add(k);
+    }
+    for (const b of (delta.placed || [])) {
+        const bType = b.type ?? b.blockType;
+        const k = bkey(b.x, b.y, b.z);
+        userRemoved.delete(k); // placed приоритетнее removed
+        userPlaced.set(k, { x: b.x, y: b.y, z: b.z, type: bType });
+    }
+}
+
 async function loadWorldDelta(saved) {
     try {
         const delta = saved;
@@ -1618,6 +1633,9 @@ function addBlock(x, y, z, type) {
     const k = bkey(x, y, z);
     if (blockMap.has(k)) { addBlock._lastFail = `occupied`; return; }
     if (userRemoved.has(k)) { addBlock._lastFail = `removed`; return; }
+    // Во время генерации мира пропускаем позиции из userPlaced —
+    // они будут поставлены loadWorldDelta с правильным типом блока
+    if (!worldGenDone && userPlaced.has(k)) { addBlock._lastFail = `userplaced`; return; }
     addBlock._lastFail = null;
 
     const rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
@@ -2010,7 +2028,29 @@ function processBuildQueue() {
     // Пропускаем генерацию, если бюджет кадра уже исчерпан
     if (performance.now() - _frameStartMs >= CHUNK_FRAME_BUDGET_MS) return;
     const { cx, cz, k } = buildQueue.shift();
-    if (!loadedChunks.has(k)) { generateChunk(cx, cz); loadedChunks.set(k, true); flushColors(); }
+    if (!loadedChunks.has(k)) {
+        generateChunk(cx, cz);
+        loadedChunks.set(k, true);
+        // После генерации восстанавливаем пользовательские блоки этого чанка
+        const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
+        let chunkDirty = false;
+        for (const [pk, b] of userPlaced) {
+            if (b.x >= x0 && b.x < x0 + CHUNK_SIZE && b.z >= z0 && b.z < z0 + CHUNK_SIZE) {
+                const existing = blockMap.get(pk);
+                if (existing) {
+                    if (existing.type === "aquarium") removeAquariumFish(existing.x, existing.y, existing.z);
+                    removeBlock(existing);
+                }
+                userRemoved.delete(pk);
+                addBlock._lastFail = null;
+                addBlock(b.x, b.y, b.z, b.type);
+                if (!addBlock._lastFail && b.type === "aquarium") spawnAquariumFish(b.x, b.y, b.z);
+                chunkDirty = true;
+            }
+        }
+        if (chunkDirty) { flushColors(); flushDirtyChunks(); }
+        else flushColors();
+    }
     loadingEl.textContent = "";
 }
 
@@ -3667,10 +3707,8 @@ function connectMultiplayer(serverUrl, playerName) {
                 // Инициализируем мир серверным seed
                 if (msg.seed) { initWorldSeed(msg.seed); spawnPigs(); }
                 if (msg.worldTime != null) anchorDayTime(msg.worldTime);
-                // Ждём применения дельты прежде чем генерировать чанки —
-                // иначе scheduleChunks заполнит blockMap сгенерированными блоками
-                // раньше, чем loadWorldDelta дойдёт до них, и addBlock тихо
-                // пропустит блоки из дельты с ошибкой "occupied".
+                // Регистрируем sets ДО scheduleChunks, потом применяем блоки
+                if (msg.delta) preloadDeltaSets(msg.delta);
                 (async () => {
                 if (msg.delta) await loadWorldDelta(msg.delta);
                 // Позиция: серверная (повторный вход) или спавн
@@ -4179,6 +4217,9 @@ async function startGame(loadSave, withMP = false) {
     requestPersistentStorage();
     if (loadSave) {
         const saved = await initWorldFromDB();
+        // Регистрируем sets ДО генерации чанков — generateChunk будет
+        // пропускать позиции из userPlaced и учитывать userRemoved
+        preloadDeltaSets(saved);
         if (saved?.playerPos) {
             const p = saved.playerPos;
             pos.set(p.x, p.y, p.z);
