@@ -28,7 +28,7 @@ body { margin: 0; overflow: hidden; background: #000; }
     display: flex; flex-direction: column; align-items: center; gap: 14px;
     opacity: 0; transition: opacity 0.5s;
     pointer-events: none;
-    margin-top: 20px;
+    margin-top: -30px;
 }
 #splash-menu.visible { opacity: 1; pointer-events: auto; }
 
@@ -42,6 +42,15 @@ body { margin: 0; overflow: hidden; background: #000; }
     cursor: pointer; user-select: none;
     width: 240px; text-align: center;
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+@media (pointer: coarse) {
+    .menu-btn {
+        font-size: 13px; letter-spacing: 1px;
+        padding: 9px 24px; width: 200px;
+        border-radius: 8px;
+    }
+    #splash-menu { gap: 10px; margin-top: 20px; }
 }
 .menu-btn:hover  { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.5); transform: translateY(-2px); }
 .menu-btn:active { transform: translateY(0); }
@@ -415,7 +424,7 @@ body { margin: 0; overflow: hidden; background: #000; }
     <button class="menu-btn multi"     id="btn-multiplayer">🌐 МУЛЬТИПЛЕЕР</button>
     <button class="menu-btn" id="btn-open-settings" style="border-color:rgba(255,255,255,0.3)">⚙ НАСТРОЙКИ</button>
     <button class="menu-btn" id="btn-exit" style="border-color:rgba(255,80,80,0.4);color:rgba(255,180,180,0.9)">✕ ВЫЙТИ</button>
-    <div id="menu-hint">проверяем сохранение… </div>
+    <div id="menu-hint">проверяем сохранение…</div>
   </div>
 </div>
 
