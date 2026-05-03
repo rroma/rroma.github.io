@@ -423,7 +423,7 @@ body { margin: 0; overflow: hidden; background: #000; }
     <button class="menu-btn load-game" id="btn-load-game" disabled>💾 ЗАГРУЗИТЬ</button>
     <button class="menu-btn multi"     id="btn-multiplayer">🌐 МУЛЬТИПЛЕЕР</button>
     <button class="menu-btn" id="btn-open-settings" style="border-color:rgba(255,255,255,0.3)">⚙ НАСТРОЙКИ</button>
-    <button class="menu-btn" id="btn-exit" style="border-color:rgba(255,80,80,0.4);color:rgba(255,180,180,0.9)">✕ ВЫЙТИ</button>
+    <button class="menu-btn" id="btn-exit" style="border-color:rgba(255,80,80,0.4);color:rgba(255,180,180,0.9);display:none">✕ ВЫЙТИ</button>
     <div id="menu-hint">проверяем сохранение…</div>
   </div>
 </div>
@@ -1377,7 +1377,11 @@ function closeSettings() {
 
 btnSettings.addEventListener("click", openSettings);
 btnSettingsClose.addEventListener("click", closeSettings);
-document.getElementById("btn-exit").addEventListener("click", () => window.close());
+const btnExit = document.getElementById("btn-exit");
+btnExit.addEventListener("click", () => {
+    if (typeof navigator.app !== "undefined") navigator.app.exitApp();
+    else window.close();
+});
 settingsOverlay.addEventListener("click", closeSettings);
 
 // Пауза
@@ -4257,6 +4261,7 @@ window.addEventListener("resize", () => {
 
 const IS_CORDOVA = typeof window.cordova !== "undefined";
 if (IS_CORDOVA) {
+    btnExit.style.display = "";
     document.addEventListener("deviceready", onReady, { once: true });
 } else {
     onReady();
