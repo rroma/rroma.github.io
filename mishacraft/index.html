@@ -203,7 +203,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 
 /* Кнопки действий — сломать и поставить */
 #btn-break {
-    position: fixed; right: 28px; bottom: 275px;
+    position: fixed; right: 110px; bottom: 195px;
     width: 62px; height: 62px; border-radius: 50%;
     background: rgba(220,80,60,0.35);
     border: 2px solid rgba(255,120,100,0.7);
@@ -3621,7 +3621,12 @@ function connectMultiplayer(serverUrl, playerName) {
                 // Инициализируем мир серверным seed
                 if (msg.seed) { initWorldSeed(msg.seed); spawnPigs(); }
                 if (msg.worldTime != null) anchorDayTime(msg.worldTime);
-                if (msg.delta) loadWorldDelta(msg.delta);
+                // Ждём применения дельты прежде чем генерировать чанки —
+                // иначе scheduleChunks заполнит blockMap сгенерированными блоками
+                // раньше, чем loadWorldDelta дойдёт до них, и addBlock тихо
+                // пропустит блоки из дельты с ошибкой "occupied".
+                (async () => {
+                if (msg.delta) await loadWorldDelta(msg.delta);
                 // Позиция: серверная (повторный вход) или спавн
                 if (msg.spawnPos) {
                     const sp = msg.spawnPos;
@@ -3665,6 +3670,7 @@ function connectMultiplayer(serverUrl, playerName) {
                     scheduleChunks(spawnX, spawnZ, true);
                     worldGenDone = true;
                 }
+                })();
                 break;
 
             case "player_join":
