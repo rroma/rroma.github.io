@@ -203,7 +203,7 @@ body { margin: 0; overflow: hidden; background: #000; }
 
 /* Кнопки действий — сломать и поставить */
 #btn-break {
-    position: fixed; right: 110px; bottom: 195px;
+    position: fixed; right: 28px; bottom: 275px;
     width: 62px; height: 62px; border-radius: 50%;
     background: rgba(220,80,60,0.35);
     border: 2px solid rgba(255,120,100,0.7);
@@ -1336,7 +1336,7 @@ spSens.addEventListener("input", () => {
 const spServerUrl   = document.getElementById("sp-server-url");
 const spPlayerName  = document.getElementById("sp-player-name");
 
-spServerUrl.value  = localStorage.getItem("mishaCraft_serverUrl") ?? "ws://localhost:3000/ws";
+spServerUrl.value  = localStorage.getItem("mishaCraft_serverUrl") ?? "wss://XXXXX.up.railway.app/ws";
 if (!localStorage.getItem("mishaCraft_serverUrl")) localStorage.setItem("mishaCraft_serverUrl", spServerUrl.value);
 spPlayerName.value = localStorage.getItem("mishaCraft_playerName") || "";
 
