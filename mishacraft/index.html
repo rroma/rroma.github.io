@@ -57,7 +57,7 @@ body.cordova .menu-btn {
     padding: 9px 24px; width: 200px;
     border-radius: 8px;
 }
-body.cordova #splash-menu { gap: 8px; margin-top: 10px; }
+body.cordova #btn-exit { display: block !important; }
 .menu-btn:hover  { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.5); transform: translateY(-2px); }
 .menu-btn:active { transform: translateY(0); }
 .menu-btn.new-game  { border-color: rgba(80,200,100,0.6); }
@@ -3858,9 +3858,9 @@ function animate(now) {
         let lines = "";
         for (const [, p] of otherPlayers) {
             const pname = p.name || "?";
-            lines += `${pname}: ${Math.round(p.cx)},${Math.round(p.cy)},${Math.round(p.cz)}\n`;
+            lines += `${pname}: ${Math.round(p.cx)},${Math.round(p.cy)},${Math.round(p.cz)}<br>`;
         }
-        hudPlayers.textContent = lines.trimEnd();
+        hudPlayers.innerHTML = lines;
     } else {
         hudPlayers.textContent = "";
     }
