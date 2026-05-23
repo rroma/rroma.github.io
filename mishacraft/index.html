@@ -173,7 +173,22 @@ body.cordova #hud-players { font-size: 10px; }
 
 #underwater {
     position: fixed; inset: 0;
-    background: rgba(0,80,180,0.18); pointer-events: none; display: none;
+    pointer-events: none; display: none;
+    background: rgba(0,60,160,0.22);
+    /* Анимированные блики как на дне бассейна */
+    background-image:
+        radial-gradient(ellipse 60% 40% at 30% 40%, rgba(80,180,255,0.13) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 35% at 70% 60%, rgba(60,160,255,0.10) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 55% 25%, rgba(100,200,255,0.08) 0%, transparent 60%);
+    animation: underwaterShimmer 3s ease-in-out infinite alternate;
+}
+@keyframes underwaterShimmer {
+    0%   { background-position: 0% 0%, 100% 100%, 50% 50%;
+           filter: brightness(1.0) hue-rotate(0deg); }
+    33%  { background-position: 8% -5%, 92% 108%, 45% 55%; }
+    66%  { background-position: -4% 10%, 104% 90%, 55% 42%; }
+    100% { background-position: 5% 8%, 96% 95%, 52% 48%;
+           filter: brightness(1.08) hue-rotate(5deg); }
 }
 #lava-overlay {
     position: fixed; inset: 0;
@@ -569,6 +584,12 @@ scene.add(sun);
 
 const DEFAULT_SERVER_URL = "wss://XXXXX.up.railway.app/ws";
 
+// ─── ГЕНЕРАЦИЯ МИРА ──────────────────────────────────────────────────────────
+const WATER_LEVEL = 0;
+const LAKE_DEPTH  = 5;
+const DEEP_LIMIT  = -15; // лава ниже этого уровня
+const RAINBOW_START_Y = -5; // радуга начинается с этой глубины
+
 // ─── ДЕНЬ / НОЧЬ ─────────────────────────────────────────────────────────────
 const DAY_DURATION = 600; // секунд на полный цикл реального времени (10 минут)
 
@@ -772,6 +793,24 @@ for (const t of INSTANCED_TYPES) {
     im.frustumCulled = false;
     scene.add(im);
     iMesh[t] = im;
+}
+
+// ─── БЕЗГРАНИЧНЫЙ ОКЕАН ──────────────────────────────────────────────────────
+// Один PlaneGeometry покрывает весь видимый горизонт — 1 draw call, без чанков.
+{
+    const oceanGeo = new THREE.PlaneGeometry(200000, 200000);
+    const oceanMat = new THREE.MeshLambertMaterial({
+        color: BLOCK_COLOR["water"],
+        transparent: true, opacity: 0.38,
+        depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+    const oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+    oceanMesh.rotation.x = -Math.PI / 2;
+    oceanMesh.position.y = WATER_LEVEL - 0.02;
+    oceanMesh.frustumCulled = false;
+    oceanMesh.renderOrder = -1;
+    scene.add(oceanMesh);
 }
 
 // ─── CHUNK MESH SYSTEM ───────────────────────────────────────────────────────
@@ -1283,6 +1322,56 @@ for (const t of INSTANCED_TYPES) freeList[t] = [];
 const userPlaced  = new Map();   // bkey → {x,y,z,type}  — поставил игрок
 const userRemoved = new Set();   // bkey              — снёс игрок (был генерированным)
 
+// Пространственный индекс: chunkKey → Set<bkey>.
+// Позволяет processBuildQueue находить блоки чанка за O(1) вместо O(n).
+const _userPlacedByChunk  = new Map();
+const _userRemovedByChunk = new Map();
+
+function _chunkKeyForBlock(x, z) {
+    return chunkKey(Math.floor(Math.round(x) / CHUNK_SIZE), Math.floor(Math.round(z) / CHUNK_SIZE));
+}
+function _indexPlaced(bk, b) {
+    const ck = _chunkKeyForBlock(b.x, b.z);
+    if (!_userPlacedByChunk.has(ck)) _userPlacedByChunk.set(ck, new Set());
+    _userPlacedByChunk.get(ck).add(bk);
+}
+function _unindexPlaced(bk, b) {
+    const ck = _chunkKeyForBlock(b.x, b.z);
+    const s = _userPlacedByChunk.get(ck);
+    if (s) { s.delete(bk); if (!s.size) _userPlacedByChunk.delete(ck); }
+}
+function _indexRemoved(bk) {
+    const [rx,,rz] = bk.split(",").map(Number);
+    const ck = _chunkKeyForBlock(rx, rz);
+    if (!_userRemovedByChunk.has(ck)) _userRemovedByChunk.set(ck, new Set());
+    _userRemovedByChunk.get(ck).add(bk);
+}
+function _unindexRemoved(bk) {
+    const [rx,,rz] = bk.split(",").map(Number);
+    const ck = _chunkKeyForBlock(rx, rz);
+    const s = _userRemovedByChunk.get(ck);
+    if (s) { s.delete(bk); if (!s.size) _userRemovedByChunk.delete(ck); }
+}
+
+// Обёртки — используем вместо прямых .set/.add/.delete на userPlaced/userRemoved
+function upSet(bk, b) {
+    const old = userPlaced.get(bk);
+    if (old) _unindexPlaced(bk, old);
+    userPlaced.set(bk, b);
+    _indexPlaced(bk, b);
+}
+function upDelete(bk) {
+    const old = userPlaced.get(bk);
+    if (old) _unindexPlaced(bk, old);
+    userPlaced.delete(bk);
+}
+function urAdd(bk) {
+    if (!userRemoved.has(bk)) { userRemoved.add(bk); _indexRemoved(bk); }
+}
+function urDelete(bk) {
+    if (userRemoved.has(bk)) { userRemoved.delete(bk); _unindexRemoved(bk); }
+}
+
 // Метки: какие блоки пришли из генератора (не от игрока)
 const worldGenKeys = new Set();
 let   worldGenDone = false;      // true после загрузки стартовых чанков
@@ -1576,13 +1665,13 @@ async function initWorldFromDB() {
 function preloadDeltaSets(delta) {
     if (!delta) return;
     for (const k of (delta.removed || [])) {
-        userRemoved.add(k);
+        urAdd(k);
     }
     for (const b of (delta.placed || [])) {
         const bType = b.type ?? b.blockType;
         const k = bkey(b.x, b.y, b.z);
-        userRemoved.delete(k); // placed приоритетнее removed
-        userPlaced.set(k, { x: b.x, y: b.y, z: b.z, type: bType });
+        urDelete(k); // placed приоритетнее removed
+        upSet(k, { x: b.x, y: b.y, z: b.z, type: bType });
     }
 }
 
@@ -1596,7 +1685,7 @@ async function loadWorldDelta(saved) {
         for (const k of delta.removed) {
             const entry = blockMap.get(k);
             if (entry) { removeBlock(entry); applied++; }
-            userRemoved.add(k);
+            urAdd(k);
         }
 
         // Потом ставим блоки которые игрок добавил
@@ -1610,11 +1699,11 @@ async function loadWorldDelta(saved) {
                 removeBlock(existing);
             }
             // Снимаем флаг "удалён" — placed имеет приоритет над removed для одного и того же ключа
-            userRemoved.delete(k);
+            urDelete(k);
             addBlock._lastFail = null;
             addBlock(b.x, b.y, b.z, bType);
             if (!addBlock._lastFail && bType === "aquarium") spawnAquariumFish(b.x, b.y, b.z);
-            userPlaced.set(k, { x: b.x, y: b.y, z: b.z, type: bType });
+            upSet(k, { x: b.x, y: b.y, z: b.z, type: bType });
             applied++;
         }
 
@@ -1773,12 +1862,6 @@ function fbm(x, y, oct) {
     for (let i = 0; i < oct; i++) { v += a * noise2(x * f, y * f); s += a; a *= 0.5; f *= 2; }
     return v / s;
 }
-
-// ─── ГЕНЕРАЦИЯ МИРА ──────────────────────────────────────────────────────────
-const WATER_LEVEL = 0;
-const LAKE_DEPTH  = 5;
-const DEEP_LIMIT  = -15; // лава ниже этого уровня
-const RAINBOW_START_Y = -5; // радуга начинается с этой глубины
 
 const LAKES = [
     { x:   0, z:   0, r: 14 },
@@ -2044,17 +2127,32 @@ function processBuildQueue() {
     if (!loadedChunks.has(k)) {
         generateChunk(cx, cz);
         loadedChunks.set(k, true);
-        // После генерации восстанавливаем пользовательские блоки этого чанка
+        // После генерации восстанавливаем пользовательские блоки этого чанка.
+        // Используем chunkKey-индекс вместо полного перебора userPlaced (O(1) vs O(n)).
         const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
         let chunkDirty = false;
-        for (const [pk, b] of userPlaced) {
-            if (b.x >= x0 && b.x < x0 + CHUNK_SIZE && b.z >= z0 && b.z < z0 + CHUNK_SIZE) {
+
+        // 1. Применяем userRemoved — убираем блоки которые игрок снёс (O(k) где k = блоков в чанке)
+        const ck = chunkKey(cx, cz);
+        const removedInChunk = _userRemovedByChunk.get(ck);
+        if (removedInChunk) {
+            for (const pk of removedInChunk) {
+                const entry = blockMap.get(pk);
+                if (entry) { removeBlock(entry); chunkDirty = true; }
+            }
+        }
+
+        // 2. Применяем userPlaced — только блоки этого чанка через индекс (O(k))
+        const placedInChunk = _userPlacedByChunk.get(ck);
+        if (placedInChunk) {
+            for (const pk of placedInChunk) {
+                const b = userPlaced.get(pk);
+                if (!b) continue;
                 const existing = blockMap.get(pk);
                 if (existing) {
                     if (existing.type === "aquarium") removeAquariumFish(existing.x, existing.y, existing.z);
                     removeBlock(existing);
                 }
-                userRemoved.delete(pk);
                 addBlock._lastFail = null;
                 addBlock(b.x, b.y, b.z, b.type);
                 if (!addBlock._lastFail && b.type === "aquarium") spawnAquariumFish(b.x, b.y, b.z);
@@ -2410,7 +2508,12 @@ function checkGround() {
         || isSolid(Math.round(pos.x + r), by, Math.round(pos.z - r))
         || isSolid(Math.round(pos.x - r), by, Math.round(pos.z - r));
 }
-function checkInWater() { return isWaterAt(Math.round(pos.x), Math.round(feetY() + 0.3), Math.round(pos.z)); }
+function checkInWater() {
+    if (isWaterAt(Math.round(pos.x), Math.round(feetY() + 0.3), Math.round(pos.z))) return true;
+    // За пределами карты — безграничный океан
+    const limit = WORLD_LIMIT * CHUNK_SIZE;
+    return (Math.abs(pos.x) > limit || Math.abs(pos.z) > limit) && feetY() <= WATER_LEVEL;
+}
 function checkInLava()  { return isLavaAt(Math.round(pos.x),  Math.round(feetY() + 0.3), Math.round(pos.z)); }
 
 function _isBlockedAt(axis, sign, nx, nz, fy, heights) {
@@ -2684,9 +2787,9 @@ function doBreak() {
     currentHit = null;
     // Трекинг дельты
     if (userPlaced.has(k)) {
-        userPlaced.delete(k);
+        upDelete(k);
     } else if (worldGenKeys.has(k)) {
-        userRemoved.add(k);
+        urAdd(k);
     }
     mpSendBlock("remove", broken.x, broken.y, broken.z);
 }
@@ -2701,14 +2804,14 @@ function doPlace() {
     if (selected === "rainbow") {
         if (rainbowCrafted <= 0) return;
         const pk = bkey(bx, by, bz);
-        userRemoved.delete(pk);
+        urDelete(pk);
         addBlock._lastFail = null;
         addBlock(bx, by, bz, selected);
         if (addBlock._lastFail) {
-            if (worldGenKeys.has(pk)) userRemoved.add(pk);
+            if (worldGenKeys.has(pk)) urAdd(pk);
             return;
         }
-        userPlaced.set(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
+        upSet(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
         mpSendBlock("place", bx, by, bz, selected);
         rainbowCount--;
         rainbowCrafted--;
@@ -2721,16 +2824,16 @@ function doPlace() {
     } else {
         // Снимаем флаг "удалён" до addBlock — иначе он откажется ставить блок
         const pk = bkey(bx, by, bz);
-        userRemoved.delete(pk);
+        urDelete(pk);
         addBlock._lastFail = null;
         addBlock(bx, by, bz, selected);
         if (selected === "aquarium") spawnAquariumFish(bx, by, bz);
         if (!addBlock._lastFail) {
-            userPlaced.set(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
+            upSet(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
             mpSendBlock("place", bx, by, bz, selected);
         } else if (worldGenKeys.has(pk)) {
             // Если addBlock провалился по другой причине — восстанавливаем флаг удалённости
-            userRemoved.add(pk);
+            urAdd(pk);
         }
     }
     flushColors();
@@ -3801,18 +3904,18 @@ function connectMultiplayer(serverUrl, playerName) {
                         removeBlock(existing);
                     }
                     // Снимаем флаг "удалён" до addBlock
-                    userRemoved.delete(bk);
+                    urDelete(bk);
                     addBlock._lastFail = null;
                     addBlock(msg.x, msg.y, msg.z, msg.blockType);
                     if (!addBlock._lastFail) {
-                        userPlaced.set(bk, { x: Math.round(msg.x), y: Math.round(msg.y), z: Math.round(msg.z), type: msg.blockType });
+                        upSet(bk, { x: Math.round(msg.x), y: Math.round(msg.y), z: Math.round(msg.z), type: msg.blockType });
                     }
                     flushColors();
                 } else if (msg.action === "remove") {
                     const entry = blockMap.get(bk);
                     if (entry) { removeBlock(entry); flushColors(); }
-                    if (userPlaced.has(bk)) userPlaced.delete(bk);
-                    else if (worldGenKeys.has(bk)) userRemoved.add(bk);
+                    if (userPlaced.has(bk)) upDelete(bk);
+                    else if (worldGenKeys.has(bk)) urAdd(bk);
                 }
                 markChunkDirty(
                     Math.floor(msg.x / CHUNK_SIZE),
@@ -3917,7 +4020,9 @@ function animate(now) {
     }
 
     // Оверлеи + динамический туман
-    const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
+    const headInWater = isWaterAt(Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z))
+        // Также под водой если ниже уровня воды НА ОТКРЫТОМ ОКЕАНЕ (plane, не блоки)
+        || (interpPos.y < WATER_LEVEL && terrainHeight(Math.round(interpPos.x), Math.round(interpPos.z)) < WATER_LEVEL - 1);
     const headInLava  = isLavaAt (Math.round(interpPos.x), Math.round(interpPos.y), Math.round(interpPos.z));
     underwaterDiv.style.display  = headInWater ? "block" : "none";
     lavaOverlayDiv.style.display = headInLava  ? "block" : "none";
@@ -3929,9 +4034,9 @@ function animate(now) {
     // Также подменяем scene.background, иначе на горизонте/наверху виден кусок неба
     // (на background туман в three.js не действует).
     if (headInWater) {
-        scene.fog.color.set(0x004488);
-        scene.fog.near = 4; scene.fog.far = 32;
-        scene.background.set(0x004488);
+        scene.fog.color.set(0x0066aa);
+        scene.fog.near = 3; scene.fog.far = 28;
+        scene.background.set(0x0066aa);
     } else if (headInLava) {
         scene.fog.color.set(0x330000);
         scene.fog.near = 1; scene.fog.far = 6;
