@@ -286,6 +286,24 @@ body.cordova #hud-players { font-size: 10px; }
 }
 #btn-pause:hover { background: rgba(60,60,60,0.9); }
 
+#btn-x9 {
+    position: fixed; top: 10px; right: 60px; z-index: 30;
+    background: rgba(30,30,30,0.75);
+    border: 1.5px solid rgba(255,255,255,0.25); border-radius: 8px;
+    color: rgba(255,255,255,0.55); font-family: 'Courier New', monospace;
+    font-size: 13px; font-weight: bold; padding: 4px 10px;
+    cursor: pointer; user-select: none;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    letter-spacing: 1px;
+}
+#btn-x9:hover { background: rgba(60,60,60,0.9); }
+#btn-x9.active {
+    background: rgba(255,180,30,0.18);
+    border-color: rgba(255,180,30,0.8);
+    color: #ffb41e;
+    box-shadow: 0 0 8px rgba(255,180,30,0.4);
+}
+
 #pause-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,0.6); z-index: 500;
@@ -472,6 +490,7 @@ body.cordova #hud-players { font-size: 10px; }
 "></div>
 <div id="loading"></div>
 
+<button id="btn-x9" title="x9: ставить блоки 3×3">✦ x9</button>
 <button id="btn-pause" title="Меню (Escape)">☰</button>
 
 <div id="pause-overlay">
@@ -2794,13 +2813,15 @@ function doBreak() {
     mpSendBlock("remove", broken.x, broken.y, broken.z);
 }
 
-function doPlace() {
-    const hit = getHit();
-    if (!hit) return;
-    const e2 = hit.entry, n = hit.faceNormal;
-    const bx = e2.x + n.x, by = e2.y + n.y, bz = e2.z + n.z;
-    const dx = Math.abs(bx - pos.x), dz2 = Math.abs(bz - pos.z), dy = by - feetY();
-    if (dx < 0.6 && dz2 < 0.6 && dy > -0.1 && dy < PLAYER_H + 0.2) return;
+// ─── x9 TOGGLE ───────────────────────────────────────────────────────────────
+let x9Mode = false;
+const btnX9 = document.getElementById("btn-x9");
+btnX9.addEventListener("click", () => {
+    x9Mode = !x9Mode;
+    btnX9.classList.toggle("active", x9Mode);
+});
+
+function _placeSingle(bx, by, bz) {
     if (selected === "rainbow") {
         if (rainbowCrafted <= 0) return;
         const pk = bkey(bx, by, bz);
@@ -2822,7 +2843,6 @@ function doPlace() {
             selected = "grass";
         }
     } else {
-        // Снимаем флаг "удалён" до addBlock — иначе он откажется ставить блок
         const pk = bkey(bx, by, bz);
         urDelete(pk);
         addBlock._lastFail = null;
@@ -2832,9 +2852,63 @@ function doPlace() {
             upSet(pk, { x: Math.round(bx), y: Math.round(by), z: Math.round(bz), type: selected });
             mpSendBlock("place", bx, by, bz, selected);
         } else if (worldGenKeys.has(pk)) {
-            // Если addBlock провалился по другой причине — восстанавливаем флаг удалённости
             urAdd(pk);
         }
+    }
+}
+
+function doPlace() {
+    const hit = getHit();
+    if (!hit) return;
+    const e2 = hit.entry, n = hit.faceNormal;
+    const bx = e2.x + n.x, by = e2.y + n.y, bz = e2.z + n.z;
+    const dx = Math.abs(bx - pos.x), dz2 = Math.abs(bz - pos.z), dy = by - feetY();
+    if (dx < 0.6 && dz2 < 0.6 && dy > -0.1 && dy < PLAYER_H + 0.2) return;
+
+    if (x9Mode) {
+        // Боковой вектор камеры в горизонтальной плоскости (для ориентации вертикальной стены)
+        const sideX = Math.round(Math.cos(yaw));
+        const sideZ = Math.round(Math.sin(yaw));
+
+        const positions = [];
+
+        if (n.y > 0) {
+            // Верхняя грань -> вертикальная стена перпендикулярно взгляду
+            // горизонталь = боковой вектор камеры, вертикаль = Y вверх от by
+            for (let i = -1; i <= 1; i++) {
+                for (let j = 0; j <= 2; j++) {
+                    positions.push({ x: bx + sideX*i, y: by + j, z: bz + sideZ*i });
+                }
+            }
+        } else if (n.y < 0) {
+            // Нижняя грань -> вертикальная стена, прирастает вниз от by
+            for (let i = -1; i <= 1; i++) {
+                for (let j = 0; j >= -2; j--) {
+                    positions.push({ x: bx + sideX*i, y: by + j, z: bz + sideZ*i });
+                }
+            }
+        } else {
+            // Боковая грань -> горизонтальная плита 3x3
+            // вдоль нормали грани (0,1,2) + боковая ось (-1,0,1)
+            const side = n.x !== 0 ? {x:0,z:1} : {x:1,z:0};
+            for (let i = 0; i <= 2; i++) {       // прирост в направлении нормали
+                for (let j = -1; j <= 1; j++) {  // центр по боковой оси
+                    positions.push({
+                        x: bx + n.x*i + side.x*j,
+                        y: by,
+                        z: bz + n.z*i + side.z*j
+                    });
+                }
+            }
+        }
+
+        for (const p of positions) {
+            const ddx = Math.abs(p.x - pos.x), ddz = Math.abs(p.z - pos.z), ddy = p.y - feetY();
+            if (ddx < 0.6 && ddz < 0.6 && ddy > -0.1 && ddy < PLAYER_H + 0.2) continue;
+            _placeSingle(p.x, p.y, p.z);
+        }
+    } else {
+        _placeSingle(bx, by, bz);
     }
     flushColors();
 }
